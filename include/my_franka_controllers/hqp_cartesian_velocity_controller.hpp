@@ -15,10 +15,12 @@
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "geometry_msgs/msg/twist_stamped.hpp"
 #include "sensor_msgs/msg/joint_state.hpp"
+#include <std_msgs/msg/float64_multi_array.hpp>
+#include "my_franka_msgs/msg/hqp_distances.hpp"
 
 // Eigen & HQP Architecture
 #include <Eigen/Dense>
-#include <task/task.h>
+#include <task/allTasks.hpp>
 #include <hierarchical_qp/hierarchicalQP.h>
 #include <robot_kinematics/FrankaKinematics.hpp>
 
@@ -29,9 +31,7 @@ public:
     HqpCartesianVelocityController() = default;
     ~HqpCartesianVelocityController() = default;
 
-    // -------------------------------------------------------------------------
     // controller_interface::ControllerInterface Overrides
-    // -------------------------------------------------------------------------
     controller_interface::CallbackReturn on_init() override;
     controller_interface::InterfaceConfiguration command_interface_configuration() const override;
     controller_interface::InterfaceConfiguration state_interface_configuration() const override;
@@ -60,26 +60,37 @@ private:
     std::shared_ptr<rclcpp::Publisher<sensor_msgs::msg::JointState>> dq_cmd_pub;
     std::shared_ptr<realtime_tools::RealtimePublisher<sensor_msgs::msg::JointState>> rt_dq_cmd_pub;
 
+    rclcpp::Publisher<my_franka_msgs::msg::HqpDistances>::SharedPtr virtualwall_dist_pub;
+    std::shared_ptr<realtime_tools::RealtimePublisher<my_franka_msgs::msg::HqpDistances>> rt_virtualwall_dist_pub;
+
+    rclcpp::Publisher<my_franka_msgs::msg::HqpDistances>::SharedPtr selfhits_dist_pub;
+    std::shared_ptr<realtime_tools::RealtimePublisher<my_franka_msgs::msg::HqpDistances>> rt_selfhits_dist_pub;
+
     // HQP Components
     std::shared_ptr<FrankaKinematics> kinematics;
     std::shared_ptr<HierarchicalQP> solver;
     
-    // The Task Stack: Holds pointers to the base Task class
+    // The task stack holds pointers to the base Task class
     std::vector<std::shared_ptr<Task>> task_stack;
     std::shared_ptr<JointsConfigurationLimits> q_upper_task;
     std::shared_ptr<JointsConfigurationLimits> q_lower_task;
     std::shared_ptr<JointsVelocityLimits> dq_upper_task;
     std::shared_ptr<JointsVelocityLimits> dq_lower_task;
-    std::shared_ptr<SelfHits> self_collision;
-    std::shared_ptr<VirtualWall> virtual_wall_task;
+    std::shared_ptr<SelfHits> self_collision_task;
+    std::shared_ptr<VirtualWall> virtual_wall_task_1;
+    std::shared_ptr<VirtualWall> virtual_wall_task_2;
+    std::shared_ptr<VirtualWall> virtual_wall_task_3;
+    std::shared_ptr<VirtualWall> virtual_wall_task_4;
+    std::shared_ptr<VirtualWall> virtual_wall_task_5;
+    std::shared_ptr<VirtualWall> virtual_wall_task_6;
     std::shared_ptr<Pose> pose_task;
+    std::shared_ptr<JointSineTask> sine_task;
 
     // Math Variables
     Eigen::Matrix<double, 7, 1> q_current;
     Eigen::Matrix<double, 7, 1> q_max;
     Eigen::Matrix<double, 7, 1> q_min;
     Eigen::Matrix<double, 7, 1> dq_cmd;
-    Eigen::Matrix<double, 7, 1> dq_cmd_prev;
     Eigen::Matrix<double, 7, 1> dq_limit;
     Eigen::Matrix<double, 7, 1> ddq_limit;
     
@@ -88,7 +99,6 @@ private:
 
     // Security
     rclcpp::Time last_target_time{0};
-    double activation_ramp{0.0};
 };
 
 }  // namespace my_franka_controllers

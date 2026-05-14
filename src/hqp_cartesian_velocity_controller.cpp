@@ -34,10 +34,9 @@ controller_interface::CallbackReturn HqpCartesianVelocityController::on_configur
     auto node = get_node();
     q_max <<    2.897,  1.832,  2.897, -0.122,  2.879,  4.625,  3.054;
     q_min <<   -2.897, -1.832, -2.897, -3.071, -2.879,  0.436, -3.054;
-    dq_limit << 2.617,  2.617,  2.617,  2.617,  5.253,  5.253,  5.253;
-    // dq_limit <<   0.5,    0.5,    0.5,    0.5,    0.5,    0.5,    0.5;
+    // dq_limit << 2.617,  2.617,  2.617,  2.617,  5.253,  5.253,  5.253;
+    dq_limit <<   0.5,    0.5,    0.5,    0.5,    0.5,    0.5,    0.5;
     dq_cmd.setZero();
-    dq_cmd_prev.setZero();
 
     // Load DH Parameters
     auto a = node->get_parameter("mod_DH.a").as_double_array();
@@ -72,51 +71,83 @@ controller_interface::CallbackReturn HqpCartesianVelocityController::on_configur
     // Joints configuration task
     q_upper_task = std::make_shared<JointsConfigurationLimits>(kinematics.get(), q_max, GRB_LESS_EQUAL, 1.0);
     q_lower_task = std::make_shared<JointsConfigurationLimits>(kinematics.get(), q_min, GRB_GREATER_EQUAL, 1.0);
-    q_upper_task->set_priority_level(1);
-    q_lower_task->set_priority_level(1);
-    q_upper_task->set_slacks_state(false);
-    q_lower_task->set_slacks_state(false);
+    q_upper_task->setPriorityLevel(1);
+    q_lower_task->setPriorityLevel(1);
+    q_upper_task->setSlacksState(false);
+    q_lower_task->setSlacksState(false);
     task_stack.push_back(q_upper_task);
     task_stack.push_back(q_lower_task);
     
     // Joints velocity task
     dq_upper_task = std::make_shared<JointsVelocityLimits>(kinematics.get(), dq_limit, GRB_LESS_EQUAL, 1.0);
     dq_lower_task = std::make_shared<JointsVelocityLimits>(kinematics.get(), -dq_limit, GRB_GREATER_EQUAL, 1.0);
-    dq_upper_task->set_priority_level(1);
-    dq_lower_task->set_priority_level(1);
-    dq_upper_task->set_slacks_state(false);
-    dq_lower_task->set_slacks_state(false);
+    dq_upper_task->setPriorityLevel(1);
+    dq_lower_task->setPriorityLevel(1);
+    dq_upper_task->setSlacksState(false);
+    dq_lower_task->setSlacksState(false);
     task_stack.push_back(dq_upper_task);
     task_stack.push_back(dq_lower_task);
     
     // Self hits task
-    Eigen::VectorXi safe_points(2);
-    safe_points << 6, 7; // Wrist and End-effector
-    Eigen::VectorXi avoid_points(2);
-    avoid_points << 0, 1; // Base and Link 1
-    double selfhits_min_dist = 0.2;   // Keep EE at least 20 cm away from the base
-    auto self_collision = std::make_shared<SelfHits>(kinematics.get(), safe_points, avoid_points, selfhits_min_dist, GRB_GREATER_EQUAL, 5.0);
-    self_collision->set_priority_level(2);
-    self_collision->set_slacks_state(true);
-    task_stack.push_back(self_collision);
+    Eigen::VectorXi sefhits_safe_points(1);
+    sefhits_safe_points << 6; // End-effector
+    Eigen::VectorXi sefhits_avoid_points(2);
+    sefhits_avoid_points << 0, 3; // Base and Elbow
+    double selfhits_min_dist = 0.2; // Keep EE at least 40 cm away from the base
+    self_collision_task = std::make_shared<SelfHits>(kinematics.get(), sefhits_safe_points, sefhits_avoid_points, selfhits_min_dist, GRB_GREATER_EQUAL, 1.0);
+    self_collision_task->setPriorityLevel(2);
+    self_collision_task->setSlacksState(false);
+    task_stack.push_back(self_collision_task);
 
-    // Define a virtual wall
-    Eigen::Vector3d p1(1.0, 0.0, 0.15);
-    Eigen::Vector3d p2(0.0, 1.0, 0.15);
-    Eigen::Vector3d p3(-1.0, -1.0, 0.15);
-    Eigen::VectorXi joints_to_protect(2);
-    joints_to_protect << 4, 7; // Protecting joint 4 (elbow) and 7 (flange)
-    double virtualwall_min_dist = 0.05; // 5 cm buffer
-    virtual_wall_task = std::make_shared<VirtualWall>(kinematics.get(), p1, p2, p3, joints_to_protect, virtualwall_min_dist, GRB_GREATER_EQUAL, 5.0);
-    virtual_wall_task->set_priority_level(2);
-    virtual_wall_task->set_slacks_state(true);
-    task_stack.push_back(virtual_wall_task);
+    // Virtual walls
+    // Common settings
+    Eigen::VectorXi joints_to_protect_from_walls(2);
+    joints_to_protect_from_walls << 4, 7; 
+    double margin = 0.05; // d_min
+    double wall_gain = 1.0;
+    int wall_priority = 3;
+
+    // FLOOR (Z = 0.05)
+    Eigen::Vector3d f1(0,0,0.05), f2(1,0,0.05), f3(0,1,0.05);
+    virtual_wall_task_1 = std::make_shared<VirtualWall>(kinematics.get(), f1, f2, f3, joints_to_protect_from_walls, margin, GRB_GREATER_EQUAL, wall_gain);
+    // CEILING (Z = 1.0)
+    Eigen::Vector3d c1(0,0,1.0), c2(0,1,1.0), c3(1,0,1.0);
+    virtual_wall_task_2 = std::make_shared<VirtualWall>(kinematics.get(), c1, c2, c3, joints_to_protect_from_walls, margin, GRB_GREATER_EQUAL, wall_gain);
+    // FRONT (X = 0.7)
+    Eigen::Vector3d fr1(0.7,0,0), fr2(0.7,0,1), fr3(0.7,1,0); 
+    virtual_wall_task_3 = std::make_shared<VirtualWall>(kinematics.get(), fr1, fr2, fr3, joints_to_protect_from_walls, margin, GRB_GREATER_EQUAL, wall_gain);
+    // BACK (X = -0.5)
+    Eigen::Vector3d bk1(0.1,0,0), bk2(0.1,1,0), bk3(0.1,0,1);
+    virtual_wall_task_4 = std::make_shared<VirtualWall>(kinematics.get(), bk1, bk2, bk3, joints_to_protect_from_walls, margin, GRB_GREATER_EQUAL, wall_gain);
+    // LEFT (Y = 0.3)
+    Eigen::Vector3d l1(0,0.3,0), l2(1,0.3,0), l3(0,0.3,1);
+    virtual_wall_task_5 = std::make_shared<VirtualWall>(kinematics.get(), l1, l2, l3, joints_to_protect_from_walls, margin, GRB_GREATER_EQUAL, wall_gain);
+    // RIGHT (Y = -0.3)
+    Eigen::Vector3d r1(0,-0.3,0), r2(0,-0.3,1), r3(1,-0.3,0);
+    virtual_wall_task_6 = std::make_shared<VirtualWall>(kinematics.get(), r1, r2, r3, joints_to_protect_from_walls, margin, GRB_GREATER_EQUAL, wall_gain);
+
+    // Activate and add to stack
+    std::vector<std::shared_ptr<VirtualWall>> all_virtual_walls = {
+        virtual_wall_task_1, virtual_wall_task_2, virtual_wall_task_3, 
+        virtual_wall_task_4, virtual_wall_task_5, virtual_wall_task_6
+    };
+    for (auto& wall : all_virtual_walls) {
+        wall->setPriorityLevel(wall_priority);
+        wall->setSlacksState(false);
+        task_stack.push_back(wall);
+    }
 
     // Pose task
-    pose_task = std::make_shared<Pose>(kinematics.get(), GRB_EQUAL, Eigen::VectorXd::Ones(6), 80.0);
-    pose_task->set_priority_level(3);
-    pose_task->set_slacks_state(true);
+    pose_task = std::make_shared<Pose>(kinematics.get(), GRB_EQUAL, Eigen::VectorXd::Ones(6), 5.0);
+    pose_task->setPriorityLevel(4);
+    pose_task->setSlacksState(true);
     task_stack.push_back(pose_task);
+
+    // Sine task
+    sine_task = std::make_shared<JointSineTask>();
+    sine_task->setPriorityLevel(4);
+    sine_task->setSlacksState(true);
+    // task_stack.push_back(sine_task);
     
     // Target Subscription
     target_pose_sub = node->create_subscription<geometry_msgs::msg::PoseStamped>("~/target_pose", 10,
@@ -135,9 +166,18 @@ controller_interface::CallbackReturn HqpCartesianVelocityController::on_configur
     // Setup dq_cmd publisher
     dq_cmd_pub = get_node()->create_publisher<sensor_msgs::msg::JointState>("~/dq_cmd", rclcpp::SystemDefaultsQoS());
     rt_dq_cmd_pub = std::make_shared<realtime_tools::RealtimePublisher<sensor_msgs::msg::JointState>>(dq_cmd_pub);
-
     rt_dq_cmd_pub->msg_.velocity.resize(7);
     rt_dq_cmd_pub->msg_.name = joint_names;
+
+    // Virtual Wall Publisher
+    virtualwall_dist_pub = get_node()->create_publisher<my_franka_msgs::msg::HqpDistances>("~/virtual_wall_distances", rclcpp::SystemDefaultsQoS());
+    rt_virtualwall_dist_pub = std::make_shared<realtime_tools::RealtimePublisher<my_franka_msgs::msg::HqpDistances>>(virtualwall_dist_pub);
+    rt_virtualwall_dist_pub->msg_.distances.resize(all_virtual_walls.size() * joints_to_protect_from_walls.size());
+
+    // Self Hits Publisher
+    selfhits_dist_pub = get_node()->create_publisher<my_franka_msgs::msg::HqpDistances>("~/self_hits_distances", rclcpp::SystemDefaultsQoS());
+    rt_selfhits_dist_pub = std::make_shared<realtime_tools::RealtimePublisher<my_franka_msgs::msg::HqpDistances>>(selfhits_dist_pub);
+    rt_selfhits_dist_pub->msg_.distances.resize(sefhits_safe_points.size() * sefhits_avoid_points.size());
 
     RCLCPP_INFO(node->get_logger(), "CartesianVelocityController configured successfully.");
     return controller_interface::CallbackReturn::SUCCESS;
@@ -174,11 +214,10 @@ controller_interface::CallbackReturn HqpCartesianVelocityController::on_activate
     for (size_t i = 0; i < 7; ++i) { q_current(i) = state_interfaces_[i].get_value(); }
     kinematics->updateJointStates(q_current);
     
-    // Should do: to avoid jumps
-    // x_target = x_current
-    // quat_target = quat_current
+    // to avoid jumps
+    x_target = kinematics->getPosition();
+    quat_target = kinematics->getQuaternion();
 
-    activation_ramp = 0.0;
     last_target_time = get_node()->now();
 
     RCLCPP_INFO(get_node()->get_logger(), "Controller activated.");
@@ -196,11 +235,9 @@ controller_interface::CallbackReturn HqpCartesianVelocityController::on_deactiva
 // -------------------------------------------------------------------------
 // update: The 1000Hz Loop
 // -------------------------------------------------------------------------
-controller_interface::return_type HqpCartesianVelocityController::update(const rclcpp::Time& time, const rclcpp::Duration& period) {
-    const double dt = period.seconds();
-
+controller_interface::return_type HqpCartesianVelocityController::update(const rclcpp::Time& time, const rclcpp::Duration& /*period*/) {
     // =========================================================
-    // READ TARGET + WATCHDOG TIMEOUT
+    // READ TARGET
     // =========================================================
     // Read target from subscriber
     TargetPose* target_ptr = rt_target_pose_ptr.readFromRT();
@@ -208,14 +245,9 @@ controller_interface::return_type HqpCartesianVelocityController::update(const r
         x_target = target_ptr->position;
         quat_target = target_ptr->orientation;
         last_target_time = time;
+        target_ptr->valid = false;
     }
     
-    // Safe stop if no target for 500ms
-    if ((time - last_target_time).seconds() > 0.5) {
-        for (size_t i = 0; i < 7; ++i) command_interfaces_[i].set_value(0.0);
-        dq_cmd_prev.setZero();
-        return controller_interface::return_type::OK;
-    }
     // =========================================================
     // READ JOINTS + UPDATE KINEMATICS
     // =========================================================
@@ -226,23 +258,21 @@ controller_interface::return_type HqpCartesianVelocityController::update(const r
     // Pass the goal to the kinematics object so the Pose task can calculate 'b'
     kinematics->setDesiredPose(x_target, quat_target);
 
+    // Update sine task
+    // const double t = time.seconds();
+    // sine_task->set_time(t);
+
     // =========================================================
     // HQP SOLVER
     // =========================================================
     try {
-        int priority_level = 1;
-        
-        // Loop through all tasks and add them to the solver
-        for(const auto& task : task_stack) {
-            // Arguments: A, b, slack, sense, priorityLevel
-            solver->addConstraints(task->get_A(), task->get_b(), task->get_slacks_state(), task->getConstraintSense(), task->get_priority_level());
-            priority_level++;
+        // For all tasks
+        for (auto& task : task_stack) {
+            // Update
+            if (task->isEnabled()) task->update();
+            // Add to the solver (arguments: A, b, slack, sense, priorityLevel)
+            if (task->isEnabled()) solver->addConstraints(task->get_A(), task->get_b(), task->getSlacksState(), task->getConstraintSense(), task->getPriorityLevel());
         }
-        
-        // Add Velocity minimization as the LOWEST priority task
-        Eigen::MatrixXd A_damp = Eigen::MatrixXd::Identity(7, 7);
-        Eigen::VectorXd b_damp = Eigen::VectorXd::Zero(7);
-        solver->addConstraints(A_damp, b_damp, true, GRB_EQUAL, 3);
 
         // Solve
         solver->solve();
@@ -252,32 +282,10 @@ controller_interface::return_type HqpCartesianVelocityController::update(const r
         solver->reset();
 
     } catch (const std::exception& e) {
-        RCLCPP_ERROR_THROTTLE(get_node()->get_logger(), *get_node()->get_clock(), 1000, "HQP Solver Exception: %s", e.what());
-        for (size_t i = 0; i < 7; ++i) command_interfaces_[i].set_value(0.0);
-        return controller_interface::return_type::OK;
+        // RCLCPP_ERROR_THROTTLE(get_node()->get_logger(), *get_node()->get_clock(), 1000, "HQP Solver Exception: %s", e.what());
+        std::cout << "HQP Solver Exception: " << e.what() << std::endl;
+        dq_cmd.setZero();
     }
-
-    // =========================================================
-    // SAFETY
-    // =========================================================
-    // Safety Constraints & Scaling
-    activation_ramp = std::min(activation_ramp + dt / 0.5, 1.0);
-    dq_cmd *= activation_ramp;
-
-    // Scaling
-    {
-        double scale = 1.0;
-        for (int i = 0; i < 7; ++i) {
-            const double ratio = std::abs(dq_cmd(i)) / dq_limit(i);
-            if (ratio > 1.0) scale = std::min(scale, 1.0 / ratio);
-        }
-        dq_cmd *= scale;
-    }
-
-    // Low Pass Filter
-    const double alpha = 0.15; // Smooths out harsh Gurobi step responses
-    dq_cmd = alpha * dq_cmd + (1.0 - alpha) * dq_cmd_prev;
-    dq_cmd_prev = dq_cmd;
 
     // =========================================================
     // WRITE IN HARDWARE INTERFACE
@@ -309,6 +317,35 @@ controller_interface::return_type HqpCartesianVelocityController::update(const r
         rt_dq_cmd_pub->msg_.header.stamp = time;
         for (size_t i = 0; i < 7; ++i) rt_dq_cmd_pub->msg_.velocity[i] = dq_cmd(i);
         rt_dq_cmd_pub->unlockAndPublish();
+    }
+
+    // Publish Virtual Wall Distances
+    if (rt_virtualwall_dist_pub && rt_virtualwall_dist_pub->trylock()) {
+        rt_virtualwall_dist_pub->msg_.header.stamp = time;
+        std::vector<std::shared_ptr<VirtualWall>> walls_to_pub = {
+            virtual_wall_task_1, virtual_wall_task_2, virtual_wall_task_3,
+            virtual_wall_task_4, virtual_wall_task_5, virtual_wall_task_6
+        };
+        int msg_idx = 0;
+        for (const auto& wall : walls_to_pub) {
+            Eigen::VectorXd dists = wall->get_distances_vector();
+            for (int i = 0; i < dists.size(); ++i) {
+                if (msg_idx < (int)rt_virtualwall_dist_pub->msg_.distances.size()) {
+                    rt_virtualwall_dist_pub->msg_.distances[msg_idx++] = dists(i);
+                }
+            }
+        }
+        rt_virtualwall_dist_pub->unlockAndPublish();
+    }
+
+    // Publish Self Hits Distances
+    if (self_collision_task && rt_selfhits_dist_pub && rt_selfhits_dist_pub->trylock()) {
+        rt_selfhits_dist_pub->msg_.header.stamp = time;
+        Eigen::VectorXd selfhits_dists = self_collision_task->get_distances_vector();
+        for (int i = 0; i < selfhits_dists.size(); ++i) {
+            rt_selfhits_dist_pub->msg_.distances[i] = selfhits_dists[i];
+        }
+        rt_selfhits_dist_pub->unlockAndPublish();
     }
 
     return controller_interface::return_type::OK;

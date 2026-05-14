@@ -12,6 +12,7 @@ find_package(controller_interface REQUIRED)
 find_package(hardware_interface REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
 find_package(realtime_tools REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(Eigen3 REQUIRED)
@@ -25,6 +26,7 @@ find_package(hierarchical_qp REQUIRED)
 find_package(robot_kinematics REQUIRED)
 find_package(auxiliaries_function_and_structures REQUIRED)
 find_package(OpenMP REQUIRED)
+find_package(my_franka_msgs REQUIRED)
 
 # #GUROBI
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -51,8 +53,14 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 )
 
 add_executable(trajectory_generator_node src/trajectory_generator_node.cpp)
+add_executable(kinematic_integrator_node src/kinematic_integrator_node.cpp)
 
 target_include_directories(trajectory_generator_node PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+
+target_include_directories(kinematic_integrator_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
 )
@@ -73,6 +81,8 @@ ament_target_dependencies(${PROJECT_NAME}
   hierarchical_qp
   robot_kinematics
   auxiliaries_function_and_structures
+
+  my_franka_msgs
 )
 
 ament_target_dependencies(trajectory_generator_node
@@ -83,14 +93,20 @@ ament_target_dependencies(trajectory_generator_node
   Eigen3
 )
 
+ament_target_dependencies(kinematic_integrator_node
+  rclcpp
+  sensor_msgs
+  std_msgs
+)
+
 # Link External Math Libraries
 # We do NOT use "PUBLIC" or "PRIVATE" here to match the 
 # "plain" signature used by ament_target_dependencies above.
 target_link_libraries(${PROJECT_NAME}
   Eigen3::Eigen
   pinocchio::pinocchio
-  ${qp_LIBRARIES}     # <--- Use the variable ROS 2 creates
-  ${task_LIBRARIES}   # <--- Use the variable for task as well
+  ${qp_LIBRARIES}
+  ${task_LIBRARIES}
   ${GUROBI_CXX_LIBRARY}
   ${GUROBI_LIBRARY}
 )
@@ -99,12 +115,16 @@ target_link_libraries(trajectory_generator_node
   ${PROJECT_NAME}
 )
 
+target_link_libraries(kinematic_integrator_node
+  Eigen3::Eigen
+)
+
 # Plugin Registration and Installation
 pluginlib_export_plugin_description_file(controller_interface plugin.xml)
 
 install(DIRECTORY include/ DESTINATION include)
 install(TARGETS ${PROJECT_NAME} DESTINATION lib)
-install(TARGETS trajectory_generator_node DESTINATION lib/${PROJECT_NAME})
+install(TARGETS trajectory_generator_node kinematic_integrator_node DESTINATION lib/${PROJECT_NAME})
 install(FILES plugin.xml DESTINATION share/${PROJECT_NAME})
 
 ament_export_include_directories(include)

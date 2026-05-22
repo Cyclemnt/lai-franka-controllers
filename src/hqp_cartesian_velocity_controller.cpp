@@ -102,7 +102,7 @@ controller_interface::CallbackReturn HqpCartesianVelocityController::on_configur
     // Virtual walls
     // Common settings
     Eigen::VectorXi joints_to_protect_from_walls(2);
-    joints_to_protect_from_walls << 4, 7; 
+    joints_to_protect_from_walls << 3, 7; 
     double margin = 0.05; // d_min
     double wall_gain = 1.0;
     int wall_priority = 3;
@@ -117,7 +117,7 @@ controller_interface::CallbackReturn HqpCartesianVelocityController::on_configur
     Eigen::Vector3d fr1(0.7,0,0), fr2(0.7,0,1), fr3(0.7,1,0); 
     virtual_wall_task_3 = std::make_shared<VirtualWall>(kinematics.get(), fr1, fr2, fr3, joints_to_protect_from_walls, margin, GRB_GREATER_EQUAL, wall_gain);
     // BACK (X = -0.5)
-    Eigen::Vector3d bk1(0.1,0,0), bk2(0.1,1,0), bk3(0.1,0,1);
+    Eigen::Vector3d bk1(-0.5,0,0), bk2(-0.5,1,0), bk3(-0.5,0,1);
     virtual_wall_task_4 = std::make_shared<VirtualWall>(kinematics.get(), bk1, bk2, bk3, joints_to_protect_from_walls, margin, GRB_GREATER_EQUAL, wall_gain);
     // LEFT (Y = 0.3)
     Eigen::Vector3d l1(0,0.3,0), l2(1,0.3,0), l3(0,0.3,1);
@@ -168,6 +168,12 @@ controller_interface::CallbackReturn HqpCartesianVelocityController::on_configur
     rt_dq_cmd_pub = std::make_shared<realtime_tools::RealtimePublisher<sensor_msgs::msg::JointState>>(dq_cmd_pub);
     rt_dq_cmd_pub->msg_.velocity.resize(7);
     rt_dq_cmd_pub->msg_.name = joint_names;
+
+    // Setup joint_states publisher
+    // joint_states_pub = get_node()->create_publisher<sensor_msgs::msg::JointState>("/joint_states", rclcpp::SystemDefaultsQoS());
+    // rt_joint_states_pub = std::make_shared<realtime_tools::RealtimePublisher<sensor_msgs::msg::JointState>>(joint_states_pub);
+    // rt_joint_states_pub->msg_.position.resize(7);
+    // rt_joint_states_pub->msg_.name = joint_names;
 
     // Virtual Wall Publisher
     virtualwall_dist_pub = get_node()->create_publisher<my_franka_msgs::msg::HqpDistances>("~/virtual_wall_distances", rclcpp::SystemDefaultsQoS());
@@ -235,7 +241,7 @@ controller_interface::CallbackReturn HqpCartesianVelocityController::on_deactiva
 // -------------------------------------------------------------------------
 // update: The 1000Hz Loop
 // -------------------------------------------------------------------------
-controller_interface::return_type HqpCartesianVelocityController::update(const rclcpp::Time& time, const rclcpp::Duration& /*period*/) {
+controller_interface::return_type HqpCartesianVelocityController::update(const rclcpp::Time& time, const rclcpp::Duration& period) {
     // =========================================================
     // READ TARGET
     // =========================================================
@@ -253,6 +259,9 @@ controller_interface::return_type HqpCartesianVelocityController::update(const r
     // =========================================================
     // Read Current Joint States
     for (size_t i = 0; i < 7; ++i) { q_current(i) = state_interfaces_[i].get_value(); }
+    // double dt = period.seconds();
+    // q_current += dq_cmd * dt;
+
     kinematics->updateJointStates(q_current);
     
     // Pass the goal to the kinematics object so the Pose task can calculate 'b'
@@ -347,6 +356,14 @@ controller_interface::return_type HqpCartesianVelocityController::update(const r
         }
         rt_selfhits_dist_pub->unlockAndPublish();
     }
+
+    // if (rt_joint_states_pub && rt_joint_states_pub->trylock()) {
+    //     rt_joint_states_pub->msg_.header.stamp = time;
+    //     for (size_t i = 0; i < 7; ++i) {
+    //         rt_joint_states_pub->msg_.position[i] = q_current(i);
+    //     }
+    //     rt_joint_states_pub->unlockAndPublish();
+    // }
 
     return controller_interface::return_type::OK;
 }

@@ -66,6 +66,9 @@ private:
     rclcpp::Publisher<my_franka_msgs::msg::HqpDistances>::SharedPtr selfhits_dist_pub;
     std::shared_ptr<realtime_tools::RealtimePublisher<my_franka_msgs::msg::HqpDistances>> rt_selfhits_dist_pub;
 
+    // std::shared_ptr<rclcpp::Publisher<sensor_msgs::msg::JointState>> joint_states_pub;
+    // std::shared_ptr<realtime_tools::RealtimePublisher<sensor_msgs::msg::JointState>> rt_joint_states_pub;
+
     // HQP Components
     std::shared_ptr<FrankaKinematics> kinematics;
     std::shared_ptr<HierarchicalQP> solver;

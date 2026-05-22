@@ -68,15 +68,15 @@ void TrajectoryGenerator::start_stress_test() {
     waypoints.clear();
     Eigen::Quaterniond static_q(0.0, 1.0, 0.0, 0.0);
 
-    // waypoints.push_back({Eigen::Vector3d(-0.8,  0.0,  0.4), static_q});
-    // waypoints.push_back({Eigen::Vector3d( 0.0, -0.9,  0.4), static_q});
-    // waypoints.push_back({Eigen::Vector3d( 1.1,  0.0,  0.4), static_q});
+    waypoints.push_back({Eigen::Vector3d(-0.8,  0.0,  0.4), static_q});
+    waypoints.push_back({Eigen::Vector3d( 0.0, -0.9,  0.4), static_q});
+    waypoints.push_back({Eigen::Vector3d( 1.1,  0.0,  0.4), static_q});
 
-    waypoints.push_back({Eigen::Vector3d(-0.8,  0.0, 0.4), static_q});
-    waypoints.push_back({Eigen::Vector3d(-0.8, -0.8, 0.4), static_q});
-    waypoints.push_back({Eigen::Vector3d( 0.0, -0.8, 0.4), static_q});
-    waypoints.push_back({Eigen::Vector3d( 1.0, -0.8, 0.4), static_q});
-    waypoints.push_back({Eigen::Vector3d( 1.0,  0.0, 0.4), static_q});
+    // waypoints.push_back({Eigen::Vector3d(-0.8,  0.0, 0.4), static_q});
+    // waypoints.push_back({Eigen::Vector3d(-0.8, -0.8, 0.4), static_q});
+    // waypoints.push_back({Eigen::Vector3d( 0.0, -0.8, 0.4), static_q});
+    // waypoints.push_back({Eigen::Vector3d( 1.0, -0.8, 0.4), static_q});
+    // waypoints.push_back({Eigen::Vector3d( 1.0,  0.0, 0.4), static_q});
 
     current_mode = Mode::STRESS_TEST;
     current_waypoint_idx = 0;

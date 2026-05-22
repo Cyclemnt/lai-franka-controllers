@@ -28,6 +28,8 @@ find_package(auxiliaries_function_and_structures REQUIRED)
 find_package(OpenMP REQUIRED)
 find_package(my_franka_msgs REQUIRED)
 
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(LIBUSB1 REQUIRED libusb-1.0)
 # #GUROBI
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}")
 find_package(GUROBI REQUIRED)
@@ -53,16 +55,22 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 )
 
 add_executable(trajectory_generator_node src/trajectory_generator_node.cpp)
-add_executable(kinematic_integrator_node src/kinematic_integrator_node.cpp)
+add_executable(joy_teleop_node src/joy_teleop_node.cpp)
+add_executable(raw_usb_joy_node src/raw_usb_joy_node.cpp)
 
 target_include_directories(trajectory_generator_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
 )
 
-target_include_directories(kinematic_integrator_node PUBLIC
+target_include_directories(joy_teleop_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
+)
+
+target_include_directories(raw_usb_joy_node PRIVATE 
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  ${LIBUSB1_INCLUDE_DIRS}
 )
 
 # Link ROS 2 dependencies (Standard ROS 2 Macro)
@@ -93,11 +101,16 @@ ament_target_dependencies(trajectory_generator_node
   Eigen3
 )
 
-ament_target_dependencies(kinematic_integrator_node
+ament_target_dependencies(joy_teleop_node
   rclcpp
+  geometry_msgs
   sensor_msgs
-  std_msgs
+  tf2_ros
+  tf2_eigen
+  Eigen3
 )
+
+ament_target_dependencies(raw_usb_joy_node rclcpp sensor_msgs)
 
 # Link External Math Libraries
 # We do NOT use "PUBLIC" or "PRIVATE" here to match the 
@@ -115,16 +128,18 @@ target_link_libraries(trajectory_generator_node
   ${PROJECT_NAME}
 )
 
-target_link_libraries(kinematic_integrator_node
-  Eigen3::Eigen
+target_link_libraries(joy_teleop_node
+  ${PROJECT_NAME}
 )
+
+target_link_libraries(raw_usb_joy_node ${LIBUSB1_LIBRARIES})
 
 # Plugin Registration and Installation
 pluginlib_export_plugin_description_file(controller_interface plugin.xml)
 
 install(DIRECTORY include/ DESTINATION include)
 install(TARGETS ${PROJECT_NAME} DESTINATION lib)
-install(TARGETS trajectory_generator_node kinematic_integrator_node DESTINATION lib/${PROJECT_NAME})
+install(TARGETS raw_usb_joy_node joy_teleop_node trajectory_generator_node DESTINATION lib/${PROJECT_NAME})
 install(FILES plugin.xml DESTINATION share/${PROJECT_NAME})
 
 ament_export_include_directories(include)

@@ -1,0 +1,7 @@
+/joy_teleop_node:
+  ros__parameters:
+    base_frame: "fr3_link0"
+    ee_frame: "fr3_link8"
+    publish_rate: 100.0
+    v_max: 0.04          # Maximum translation speed (m/s)
+    omega_max: 0.08      # Maximum rotation speed (rad/s)

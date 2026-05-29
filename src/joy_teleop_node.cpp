@@ -9,9 +9,9 @@ JoyTeleopNode::JoyTeleopNode(const rclcpp::NodeOptions & options)
 {
     this->declare_parameter<std::string>("base_frame", "fr3_link0");
     this->declare_parameter<std::string>("ee_frame", "fr3_link8");
-    this->declare_parameter<double>("publish_rate", 50.0);
-    this->declare_parameter<double>("v_max", 0.20);        
-    this->declare_parameter<double>("omega_max", 0.20);    
+    this->declare_parameter<double>("publish_rate", 1000.0);
+    this->declare_parameter<double>("v_max", 0.10);
+    this->declare_parameter<double>("omega_max", 0.10);
 
     this->get_parameter("base_frame", base_frame);
     this->get_parameter("ee_frame", ee_frame);
@@ -29,7 +29,7 @@ JoyTeleopNode::JoyTeleopNode(const rclcpp::NodeOptions & options)
     auto period = std::chrono::duration<double>(dt);
     timer = this->create_wall_timer(period, std::bind(&JoyTeleopNode::timer_callback, this));
 
-    RCLCPP_INFO(this->get_logger(), "High-Dynamic Quaternion Teleop Engine Running.");
+    RCLCPP_INFO(this->get_logger(), "Teleop Engine Running.");
 }
 
 bool JoyTeleopNode::get_current_pose(double &x, double &y, double &z, tf2::Quaternion &q) {
@@ -52,36 +52,27 @@ void JoyTeleopNode::joy_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
     cmd_x = 0.0; cmd_y = 0.0; cmd_z = 0.0;
     cmd_roll = 0.0; cmd_pitch = 0.0; cmd_yaw = 0.0;
 
-    if (msg->axes.size() >= 4) {
-        // Left joystick up : translation +x
-        // Left joystick down : translation -x
+    if (msg->axes.size() >= 6) {
         cmd_x = msg->axes[1]; 
-
-        // Left joystick left : translation +y
-        // Left joystick right : translation -y
-        // (Stick left is negative)
-        cmd_y = -msg->axes[0]; 
-
-        // Right joystick up : rotation +x
-        // Right joystick down : rotation -x
+        cmd_y = -msg->axes[0];
+        
         cmd_roll = msg->axes[3]; 
+        cmd_pitch = msg->axes[4];
 
-        // Right joystick left : rotation +y
-        // Right joystick right : rotation -y
-        // (Stick left is negative)
-        cmd_pitch = -msg->axes[2]; 
+        double lt_axis = msg->axes[2];
+        double rt_axis = msg->axes[5];
+
+        if (lt_axis < 0.9) {
+            cmd_z = (1.0 - lt_axis) / 2.0;
+        } else if (rt_axis < 0.9) {
+            cmd_z = -(1.0 - rt_axis) / 2.0;
+        }
+        
     }
 
-    if (msg->buttons.size() >= 8) {
-        // LB : translation +z
-        // LT : translation -z
-        if (msg->buttons[4] == 1) cmd_z = 1.0;
-        else if (msg->buttons[6] == 1) cmd_z = -1.0;
-
-        // RB : rotation +z
-        // RT : rotation -z
-        if (msg->buttons[5] == 1) cmd_yaw = 1.0;
-        else if (msg->buttons[7] == 1) cmd_yaw = -1.0;
+    if (msg->buttons.size() >= 6) {
+        if (msg->buttons[4] == 1) cmd_yaw = 1.0;
+        else if (msg->buttons[5] == 1) cmd_yaw = -1.0;
     }
 }
 
@@ -106,7 +97,7 @@ void JoyTeleopNode::timer_callback() {
     const double ACCEL_LIMIT_ROT   = 0.5;  
 
     auto update_axis_velocity = [this](double command, double &current_vel, double max_vel, double accel_lim) {
-        if (std::abs(command) < 0.1) {
+        if (std::abs(command) < 0.05) {
             current_vel = 0.0; 
             return;
         }
@@ -131,17 +122,6 @@ void JoyTeleopNode::timer_callback() {
 
     // Integrate Orientation Target
     tf2::Vector3 omega(current_vel_roll, current_vel_pitch, current_vel_yaw);
-    // Rotation in world frame
-    // if (omega.length2() > 1e-8) {
-    //     tf2::Quaternion dq(
-    //         0.5 * ( omega.x() * target_q.w() + omega.y() * target_q.z() - omega.z() * target_q.y()),
-    //         0.5 * (-omega.x() * target_q.z() + omega.y() * target_q.w() + omega.z() * target_q.x()),
-    //         0.5 * ( omega.x() * target_q.y() - omega.y() * target_q.x() + omega.z() * target_q.w()),
-    //         0.5 * (-omega.x() * target_q.x() - omega.y() * target_q.y() - omega.z() * target_q.z())
-    //     );
-    //     target_q = target_q + dq * dt;
-    //     target_q.normalize();
-    // }
     // Rotation in EE Frame:
     if (omega.length2() > 1e-8) {
         tf2::Quaternion dq;
@@ -151,13 +131,13 @@ void JoyTeleopNode::timer_callback() {
     }
 
     // Clamp translation
-    const double Max_Translation_Lead = 0.04; 
+    const double Max_Translation_Lead = 0.005; 
     target_x = std::clamp(target_x, current_x - Max_Translation_Lead, current_x + Max_Translation_Lead);
     target_y = std::clamp(target_y, current_y - Max_Translation_Lead, current_y + Max_Translation_Lead);
     target_z = std::clamp(target_z, current_z - Max_Translation_Lead, current_z + Max_Translation_Lead);
 
     // Clamp rotations
-    const double Max_Rotation_Lead = 0.25; // Radians
+    const double Max_Rotation_Lead = 0.05; // Radians
     tf2::Quaternion q_error = current_q.inverse() * target_q;
     q_error.normalize();
     double angle = q_error.getAngleShortestPath();

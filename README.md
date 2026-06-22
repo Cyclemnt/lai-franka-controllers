@@ -1,64 +1,131 @@
 # My Franka ROS 2 Controllers
 
-This package implements a high-performance Cartesian Velocity Controller and a Dynamic Trajectory Generator for the Franka Emika FR3 robot using the ros2_control framework and the Pinocchio kinematics library.
+This package implements an advanced suite of real-time Cartesian motion controllers and trajectory planning nodes for the Franka Emika FR3 manipulator using the ros2_control framework. 
+
+The flagship implementation is a strict-priority Hierarchical Quadratic Programming (HQP) controller. It ensures mathematically guaranteed safety boundaries (joint limits, self-collision, virtual walls) while actively optimizing Cartesian tracking directly within the 1 kHz hardware communication loop.
 
 ## Features
 
-- **Real-Time Performance**: Optimized C++ logic designed for 1kHz control loops.
-- **Adaptive Damping**: Employs a damped pseudo-inverse Jacobian with adaptive lambda based on manipulability to handle singular configurations.
-- **Nullspace Projection**: Utilizes the robot's redundancy for joint limit avoidance without compromising the primary Cartesian task.
-- **Safety Features**: Includes velocity command scaling, singularity thresholds, and low-pass filtering to ensure smooth hardware operation.
-- **Quintic Trajectory Generation**: Standalone node for computing smooth S-curve motion profiles with dynamic duration based on Cartesian distance.
+- **Real-Time HQP Architecture**: Solves complex, priority-based optimizations (via Gurobi) at 1000 Hz to safely bound commands before they reach the physical hardware.
+- **Strict Safety Priorities**: 
+  1. Joint Configuration & Velocity Limits (Hard constraints)
+  2. Self-Collision Avoidance (Hard constraints)
+  3. Virtual Workspace Walls (Hard constraints)
+  4. Cartesian Pose Tracking (Soft constraints)
+- **Quintic Trajectory Generation**: Standalone node for generating smooth, synchronized S-curve motion profiles. Includes an automated "Stress Test" sequence to validate HQP boundaries.
+- **WSL2 Native Teleoperation**: Custom libusb endpoint reader to bypass WSL2's missing joystick driver support, allowing direct teleoperation of the end-effector via Xbox/Logitech gamepads.
 
 ## Package Structure
 
-- **src/cartesian_velocity_controller.cpp**: Implementation of the controller plugin.
-- **src/trajectory_generator_node.cpp**: ROS 2 node for generating target poses.
-- **include/**: Header files defining the controller and generator classes.
-- **my_franka_controllers.xml**: Pluginlib export definitions.
+- **src/hqp_cartesian_velocity_controller.cpp**: Core 1kHz HQP controller plugin.
+- **src/cartesian_velocity_controller.cpp**: Legacy CLIK velocity controller using Pinocchio.
+- **src/trajectory_generator_node.cpp**: Quintic S-curve Cartesian path planner.
+- **src/joy_teleop_node.cpp**: Maps gamepad inputs to Cartesian velocity integrations.
+- **src/raw_usb_joy_node.cpp**: WSL2-compatible direct libusb gamepad driver.
 
-## Control Architecture
+## Dependencies
 
-The control law implemented is based on the following relationship:
+- **ROS 2 Humble**
+- **libfranka** & **franka_ros2**
+- **Gurobi Optimizer** (Valid license required)
+- **libusb-1.0-0-dev** (For WSL gamepad node)
+- **Pinocchio** (For legacy CLIK controller/kinematics)
 
-dq_dot = J_inv_A * (K * delta_x) + (I - J_inv * J) * dq_null
+## Installation & Build Instructions
 
-- **Primary Task**: Minimizes Cartesian pose error using a proportional gain matrix (K).
-- **Secondary Task**: Projects a joint-limit avoidance gradient into the nullspace of the Jacobian.
-- **Scaling**: If any joint velocity exceeds hardware limits, the entire vector is scaled uniformly to maintain the direction of the end-effector motion.
-
-## Installation
-
-Building in Release mode is required to maintain the 1kHz cycle time:
+Building in Release mode is strictly required to ensure the Gurobi optimization solver can complete its cascade within the 1 ms hardware timing constraint.
 
 ```bash
+cd ~/franka_ros2_ws/
+
+# Optional: Build the whole workspace with symlinks for fast iteration
+colcon build --symlink-install
+
+# Mandatory: Build the controllers package in Release mode
 colcon build --packages-select my_franka_controllers --cmake-args -DCMAKE_BUILD_TYPE=Release
+
+# Source the workspace
 source install/setup.bash
+
 ```
 
-## Usage
+## Usage Guide
 
-1. Load the Controller
-Ensure your robot description includes the controller configuration, then activate it:
+### 1. Launch the Simulation (Gazebo)
+
+Start the headless Gazebo simulation with the HQP controller activated:
+
 ```bash
-ros2 control load_controller --set-state active my_cartesian_controller
+ros2 launch franka_gazebo_bringup gazebo_franka_arm_example_controller.launch.py \
+    controller:=my_hqp_cartesian_controller \
+    gz_args:="-r -s empty.sdf"
+
 ```
 
-2. Run the Trajectory Generator
+*(To use the legacy unconstrained controller, replace my_hqp_cartesian_controller with my_cartesian_controller)*
+
+### 2. Send Target Poses (CLI)
+
+You can send direct Cartesian targets to the controller. The HQP will automatically cap velocities and respect virtual walls to reach these goals safely:
+
+```bash
+ros2 topic pub -1 /my_hqp_cartesian_controller/target_pose geometry_msgs/msg/PoseStamped \
+"{header: {frame_id: 'world'}, pose: {position: {x: 0.6, y: 0.0, z: 0.4}, orientation: {x: 1.0, y: 0.0, z: 0.0, w: 0.0}}}"
+
+ros2 topic pub -1 /my_hqp_cartesian_controller/target_pose geometry_msgs/msg/PoseStamped \
+"{header: {frame_id: 'world'}, pose: {position: {x: 0.306889, y: 0.0, z: 0.590272}, orientation: {x: 0.923879, y: -0.382684, z: 0.0, w: 0.0}}}"
+
+```
+
+### 3. Smooth Trajectory Generation
+
+Instead of step-inputs via CLI, use the generator to feed smooth S-curves to the controller:
+
 ```bash
 ros2 run my_franka_controllers trajectory_generator_node
+
 ```
 
-3. Send a Goal
-Publish a PoseStamped message to the goal topic:
+* **Manual Goals**: Publish standard goals to `/goal_pose`. The node will generate a quintic trajectory from the current EE position to the goal.
+* **Stress Test Sequence**: Sending a goal with a negative Z-value (`z < 0.0`) triggers an automated multi-waypoint stress test designed to dynamically test the HQP limits.
+
+### 4. Gamepad Teleoperation (WSL2)
+
+If running inside WSL2 where standard `/dev/input/js0` is unavailable, use the raw USB node alongside the teleop integration node:
+
 ```bash
-ros2 topic pub /goal_pose geometry_msgs/msg/PoseStamped "{pose: {position: {x: 0.4, y: 0.0, z: 0.5}}}"
+# Run the raw USB reader (requires Logitech F310/F710 in X-Input mode)
+ros2 run my_franka_controllers raw_usb_joy_node
+
+# Run the teleop integration node in a separate terminal
+ros2 run my_franka_controllers joy_teleop_node
+
 ```
 
-## Monitoring
-The controller publishes tracking errors to:
+## Diagnostics & Monitoring
+
+The controller runs lock-free real-time publishers to stream state constraints. You can record these for analysis:
+
 ```bash
-/my_cartesian_controller/tracking_error
+ros2 bag record /my_hqp_cartesian_controller/target_pose \
+                /my_hqp_cartesian_controller/tracking_error \
+                /my_hqp_cartesian_controller/dq_cmd \
+                /tf \
+                /joint_states
+
 ```
 
-This can be monitored using PlotJuggler or standard ROS 2 echo commands to verify controller convergence.
+To visualize the tracking errors, wall distances, and self-collision avoidance in real-time, launch PlotJuggler:
+
+```bash
+ros2 run plotjuggler plotjuggler
+
+```
+
+**Key diagnostic topics to monitor:**
+
+* `/my_hqp_cartesian_controller/tracking_error`
+* `/my_hqp_cartesian_controller/virtual_wall_distances`
+* `/my_hqp_cartesian_controller/self_hits_distances`
+
+```

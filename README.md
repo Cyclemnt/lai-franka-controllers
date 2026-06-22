@@ -127,5 +127,3 @@ ros2 run plotjuggler plotjuggler
 * `/my_hqp_cartesian_controller/tracking_error`
 * `/my_hqp_cartesian_controller/virtual_wall_distances`
 * `/my_hqp_cartesian_controller/self_hits_distances`
-
-```

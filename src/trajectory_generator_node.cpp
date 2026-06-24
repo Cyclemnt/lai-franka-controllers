@@ -5,7 +5,7 @@ using namespace std::chrono_literals;
 namespace my_franka_controllers {
 
 TrajectoryGenerator::TrajectoryGenerator() : Node("trajectory_generator") {
-    cmd_pub = this->create_publisher<geometry_msgs::msg::PoseStamped>("/my_hqp_cartesian_controller/target_pose", 10);
+    cmd_pub = this->create_publisher<geometry_msgs::msg::PoseStamped>("/hqp_reference_generator_node/target_pose", 10);
     goal_sub = this->create_subscription<geometry_msgs::msg::PoseStamped>("/goal_pose", 10, std::bind(&TrajectoryGenerator::goal_callback, this, std::placeholders::_1));
 
     tf_buffer = std::make_unique<tf2_ros::Buffer>(this->get_clock());

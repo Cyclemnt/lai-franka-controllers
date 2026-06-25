@@ -6,6 +6,7 @@
 #include <vector>
 #include <string>
 #include <chrono>
+#include <mutex>
 
 namespace my_franka_controllers {
 
@@ -16,15 +17,20 @@ public:
 
 private:
     void timer_callback();
+    void joint_state_callback(const sensor_msgs::msg::JointState::SharedPtr msg);
 
     rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr publisher_;
+    rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_sub_;
     rclcpp::TimerBase::SharedPtr timer_;
+    
     rclcpp::Time start_time_;
+    bool is_initialized_{false};
+    std::mutex data_mutex_;
 
     std::vector<std::string> joint_names_;
+    std::vector<double> initial_positions_;
     std::vector<double> amplitudes_;
     std::vector<double> frequencies_;
-    std::vector<double> phases_;
 };
 
 } // namespace my_franka_controllers

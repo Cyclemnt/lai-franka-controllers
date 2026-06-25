@@ -9,6 +9,7 @@
 #include "controller_interface/controller_interface.hpp"
 #include "rclcpp_lifecycle/state.hpp"
 #include "realtime_tools/realtime_buffer.hpp"
+#include "realtime_tools/realtime_publisher.hpp"
 
 // ROS 2 Messages
 #include "sensor_msgs/msg/joint_state.hpp"
@@ -44,12 +45,17 @@ private:
     // ROS 2 Parameters & Communication
     std::vector<std::string> joint_names;
     size_t num_joints;
+
+    std::shared_ptr<rclcpp::Publisher<sensor_msgs::msg::JointState>> dq_cmd_pub;
+    std::shared_ptr<realtime_tools::RealtimePublisher<sensor_msgs::msg::JointState>> rt_dq_cmd_pub;
     
     // Proportional Gains (K)
     Eigen::VectorXd k_gains;
 
-    // Safety Timeout
+    // Safety & Smoothing Parameters
     double timeout_sec{0.1};
+    int smoothing_iterations{10};
+    double max_allowed_dv{0.001};
 
     // Subscription and Realtime Buffer
     rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_command_sub;
@@ -58,6 +64,7 @@ private:
     // Math Variables
     Eigen::VectorXd q_current;
     Eigen::VectorXd dq_cmd;
+    Eigen::VectorXd prev_dq_cmd;
 };
 
 }  // namespace my_franka_controllers

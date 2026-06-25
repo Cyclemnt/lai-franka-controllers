@@ -22,12 +22,10 @@ JointSinePublisherNode::JointSinePublisherNode() : Node("joint_sine_publisher") 
     current_positions_.resize(7, 0.0);
 
     amplitudes_  = {0.10, 0.10, 0.10, 0.10, 0.10, 0.10, 0.10}; // Radians
-    frequencies_ = {0.15, 0.15, 0.15, 0.15, 0.15, 0.15, 0.15}; // Hz
+    frequencies_ = {0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05}; // Hz
 
     // 100 Hz Loop
-    timer_ = this->create_wall_timer(
-        10ms, std::bind(&JointSinePublisherNode::timer_callback, this)
-    );
+    timer_ = this->create_wall_timer(10ms, std::bind(&JointSinePublisherNode::timer_callback, this));
 
     RCLCPP_INFO(this->get_logger(), "Waiting for /joint_states to capture initial hardware position...");
 }
@@ -86,6 +84,7 @@ void JointSinePublisherNode::timer_callback() {
         // Reset start time continuously during the delay so that t=0 when the sine finally starts
         start_time_ = current_time;
         iteration_count_++;
+        RCLCPP_INFO(this->get_logger(), "Waiting.");
     } 
     else {
         // Standard Sine trajectory computation
@@ -99,19 +98,17 @@ void JointSinePublisherNode::timer_callback() {
             // dq = A * w * sin(wt)
             msg.velocity[i] = amplitudes_[i] * omega * std::sin(omega * t);
         }
-    }
 
-    // Compute and print tracking error
-    double max_tracking_error = 0.0;
-    for (size_t i = 0; i < 7; ++i) {
-        double err = std::abs(current_positions_[i] - msg.position[i]);
-        if (err > max_tracking_error) {
-            max_tracking_error = err;
+        // Compute and print tracking error
+        double max_tracking_error = 0.0;
+        for (size_t i = 0; i < 7; ++i) {
+            double err = std::abs(current_positions_[i] - msg.position[i]);
+            if (err > max_tracking_error) {
+                max_tracking_error = err;
+            }
         }
+        RCLCPP_INFO(this->get_logger(), "Max tracking error: %.5f rad", max_tracking_error);
     }
-
-    // Use a throttled logger so it only prints 10x per second (every 100ms)
-    RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 100, "Live Max Tracking Error: %.5f rad", max_tracking_error);
 
     publisher_->publish(msg);
 }

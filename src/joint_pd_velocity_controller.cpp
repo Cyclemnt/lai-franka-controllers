@@ -15,11 +15,13 @@ controller_interface::CallbackReturn JointPdVelocityController::on_init() {
     node->declare_parameter("joint_names", joint_names);
 
     // Default K gains (yaml possible)
-    std::vector<double> default_k_gains(7, 10.0);
+    std::vector<double> default_k_gains(7, 0.0);
     node->declare_parameter("k_gains", default_k_gains);
 
-    // Timeout parameter
+    // Timeout and Smoothing parameters
     node->declare_parameter("timeout_sec", 0.1);
+    node->declare_parameter("smoothing_iterations", 10);
+    node->declare_parameter("max_allowed_dv", 0.001);
 
     return controller_interface::CallbackReturn::SUCCESS;
 }
@@ -42,12 +44,22 @@ controller_interface::CallbackReturn JointPdVelocityController::on_configure(con
     
     k_gains = Eigen::VectorXd::Map(k_gains_std.data(), num_joints);
     timeout_sec = node->get_parameter("timeout_sec").as_double();
+    smoothing_iterations = node->get_parameter("smoothing_iterations").as_int();
+    max_allowed_dv = node->get_parameter("max_allowed_dv").as_double();
 
     // Resize Math Vectors
     q_current.resize(num_joints);
     dq_cmd.resize(num_joints);
+    prev_dq_cmd.resize(num_joints);
     q_current.setZero();
     dq_cmd.setZero();
+    prev_dq_cmd.setZero();
+
+    // Setup dq_cmd publisher
+    dq_cmd_pub = get_node()->create_publisher<sensor_msgs::msg::JointState>("~/llc_output_dq_cmd", rclcpp::SystemDefaultsQoS());
+    rt_dq_cmd_pub = std::make_shared<realtime_tools::RealtimePublisher<sensor_msgs::msg::JointState>>(dq_cmd_pub);
+    rt_dq_cmd_pub->msg_.velocity.resize(7);
+    rt_dq_cmd_pub->msg_.name = joint_names;
 
     // Setup Target Buffer Initialization
     TargetJointState initial_target;
@@ -145,24 +157,36 @@ controller_interface::return_type JointPdVelocityController::update(const rclcpp
     double time_since_last_cmd = (time - target->timestamp).seconds();
     
     if (!target->valid || time_since_last_cmd >= timeout_sec) {
-        // TIMEOUT: Commanded velocity goes exactly to zero
-        for (size_t i = 0; i < num_joints; ++i) {
-            command_interfaces_[i].set_value(0.0);
+        // TIMEOUT: Commanded velocity goes to zero
+        dq_cmd.setZero();
+    } else {
+        // Read current joint states
+        for (size_t i = 0; i < num_joints; ++i) { 
+            q_current(i) = state_interfaces_[i].get_value(); 
         }
-        return controller_interface::return_type::OK;
+
+        // Compute Control Law: dq = K * (q_d - q) + dq_d
+        dq_cmd = k_gains.cwiseProduct(target->q_d - q_current) + target->dq_d;
     }
 
-    // Read current joint states
-    for (size_t i = 0; i < num_joints; ++i) { 
-        q_current(i) = state_interfaces_[i].get_value(); 
+    // Safety Smoothing: If difference between samples is too high, smooth it out
+    Eigen::VectorXd delta_dq = dq_cmd - prev_dq_cmd;
+    if (delta_dq.cwiseAbs().maxCoeff() > max_allowed_dv) {
+        dq_cmd = prev_dq_cmd + delta_dq / static_cast<double>(smoothing_iterations);
     }
-
-    // Compute Control Law: dq = K * (q_d - q) + dq_d
-    dq_cmd = k_gains.cwiseProduct(target->q_d - q_current) + target->dq_d;
+    
+    prev_dq_cmd = dq_cmd;
 
     // Write to Hardware Interfaces
     for (size_t i = 0; i < num_joints; ++i) {
         command_interfaces_[i].set_value(dq_cmd(i));
+    }
+
+    // Publish commands for debugging
+    if (rt_dq_cmd_pub && rt_dq_cmd_pub->trylock()) {
+        rt_dq_cmd_pub->msg_.header.stamp = time;
+        for (size_t i = 0; i < 7; ++i) rt_dq_cmd_pub->msg_.velocity[i] = dq_cmd(i);
+        rt_dq_cmd_pub->unlockAndPublish();
     }
 
     return controller_interface::return_type::OK;

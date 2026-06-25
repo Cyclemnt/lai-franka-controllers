@@ -27,8 +27,13 @@ private:
     bool is_initialized_{false};
     std::mutex data_mutex_;
 
+    // Delay variables
+    int iteration_count_{0};
+    int n_delay_iterations_{1}; // Wait for n iterations before starting the sine wave
+
     std::vector<std::string> joint_names_;
     std::vector<double> initial_positions_;
+    std::vector<double> current_positions_; // Added to track live hardware state
     std::vector<double> amplitudes_;
     std::vector<double> frequencies_;
 };

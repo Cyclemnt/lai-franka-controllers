@@ -14,7 +14,7 @@ controller_interface::CallbackReturn JointPdVelocityController::on_init() {
     joint_names = {"fr3_joint1", "fr3_joint2", "fr3_joint3", "fr3_joint4", "fr3_joint5", "fr3_joint6", "fr3_joint7"};
     node->declare_parameter("joint_names", joint_names);
 
-    // Default K gains (Can be tuned via yaml parameters)
+    // Default K gains (yaml possible)
     std::vector<double> default_k_gains(7, 10.0);
     node->declare_parameter("k_gains", default_k_gains);
 
@@ -61,10 +61,7 @@ controller_interface::CallbackReturn JointPdVelocityController::on_configure(con
     joint_command_sub = node->create_subscription<sensor_msgs::msg::JointState>(
         "~/joint_commands", 10,
         [this](const sensor_msgs::msg::JointState::SharedPtr msg) {
-            if (msg->position.size() != num_joints || msg->velocity.size() != num_joints) {
-                // Ignore malformed messages silently to protect real-time loop
-                return;
-            }
+            if (msg->position.size() != num_joints || msg->velocity.size() != num_joints) return;
 
             TargetJointState target;
             target.q_d = Eigen::VectorXd::Map(msg->position.data(), num_joints);
@@ -113,7 +110,7 @@ controller_interface::CallbackReturn JointPdVelocityController::on_activate(cons
         q_current(i) = state_interfaces_[i].get_value(); 
     }
 
-    // Initialize the buffer to the current state so the robot holds its position until a valid external command arrives.
+    // Initialize the buffer to the current state.
     TargetJointState init_state;
     init_state.q_d = q_current;
     init_state.dq_d = Eigen::VectorXd::Zero(num_joints);
@@ -129,7 +126,7 @@ controller_interface::CallbackReturn JointPdVelocityController::on_activate(cons
 // on_deactivate
 // -------------------------------------------------------------------------
 controller_interface::CallbackReturn JointPdVelocityController::on_deactivate(const rclcpp_lifecycle::State&) {
-    // Safely zero out commands on shutdown
+    // Zero out commands on shutdown
     for (size_t i = 0; i < num_joints; ++i) { 
         command_interfaces_[i].set_value(0.0); 
     }
@@ -161,7 +158,6 @@ controller_interface::return_type JointPdVelocityController::update(const rclcpp
     }
 
     // Compute Control Law: dq = K * (q_d - q) + dq_d
-    // Array multiplication is used so the K vector multiplies element-wise
     dq_cmd = k_gains.cwiseProduct(target->q_d - q_current) + target->dq_d;
 
     // Write to Hardware Interfaces

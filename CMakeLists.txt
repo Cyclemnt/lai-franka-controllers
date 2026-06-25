@@ -45,8 +45,6 @@ link_directories(/home/cyclement/franka_ros2_ws/install/qp/lib)
 
 # Create the library
 add_library(${PROJECT_NAME} SHARED
-  src/cartesian_velocity_controller.cpp
-  src/hqp_cartesian_velocity_controller.cpp
   src/joint_pd_velocity_controller.cpp
 )
 
@@ -62,6 +60,7 @@ add_executable(joy_teleop_node src/joy_teleop_node.cpp)
 add_executable(raw_usb_joy_node src/raw_usb_joy_node.cpp)
 add_executable(joint_sine_publisher_node src/joint_sine_publisher_node.cpp)
 add_executable(hqp_reference_generator_node src/hqp_reference_generator_node.cpp)
+add_executable(cartesian_reference_generator_node src/cartesian_reference_generator_node.cpp)
 
 # Include directories for Executables
 target_include_directories(trajectory_generator_node PUBLIC
@@ -85,6 +84,11 @@ target_include_directories(joint_sine_publisher_node PUBLIC
 )
 
 target_include_directories(hqp_reference_generator_node PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+
+target_include_directories(cartesian_reference_generator_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
 )
@@ -142,6 +146,13 @@ ament_target_dependencies(hqp_reference_generator_node
   my_franka_msgs
 )
 
+ament_target_dependencies(cartesian_reference_generator_node
+  rclcpp
+  geometry_msgs
+  sensor_msgs
+  Eigen3
+)
+
 # Link External Math Libraries & Internal Project References
 target_link_libraries(${PROJECT_NAME}
   Eigen3::Eigen
@@ -174,6 +185,11 @@ target_link_libraries(hqp_reference_generator_node
   ${GUROBI_LIBRARY}
 )
 
+target_link_libraries(cartesian_reference_generator_node
+  Eigen3::Eigen
+  pinocchio::pinocchio
+)
+
 # Plugin Registration and Installation
 pluginlib_export_plugin_description_file(controller_interface plugin.xml)
 
@@ -188,6 +204,7 @@ install(TARGETS
   trajectory_generator_node 
   joint_sine_publisher_node
   hqp_reference_generator_node
+  cartesian_reference_generator_node
   DESTINATION lib/${PROJECT_NAME}
 )
 

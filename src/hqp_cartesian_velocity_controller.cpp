@@ -241,7 +241,7 @@ controller_interface::CallbackReturn HqpCartesianVelocityController::on_deactiva
 // -------------------------------------------------------------------------
 // update: The 1000Hz Loop
 // -------------------------------------------------------------------------
-controller_interface::return_type HqpCartesianVelocityController::update(const rclcpp::Time& time, const rclcpp::Duration& period) {
+controller_interface::return_type HqpCartesianVelocityController::update(const rclcpp::Time& time, const rclcpp::Duration& /*period*/) {
     // =========================================================
     // READ TARGET
     // =========================================================

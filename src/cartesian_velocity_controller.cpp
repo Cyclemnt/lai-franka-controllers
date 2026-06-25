@@ -1,4 +1,4 @@
-#include "my_franka_controllers/cartesian_velocity_controller.hpp"
+#include "lai_franka_controllers/cartesian_velocity_controller.hpp"
 
 #include <pluginlib/class_list_macros.hpp>
 #include <hardware_interface/types/hardware_interface_type_values.hpp>
@@ -7,7 +7,7 @@
 #include <pinocchio/algorithm/frames.hpp>
 #include <pinocchio/algorithm/jacobian.hpp>
 
-namespace my_franka_controllers {
+namespace lai_franka_controllers {
 
 // -------------------------------------------------------------------------
 // on_init: Declare parameters and allocate non-realtime resources
@@ -357,7 +357,7 @@ controller_interface::return_type CartesianVelocityController::update(const rclc
     return controller_interface::return_type::OK;
 }
 
-}  // namespace my_franka_controllers
+}  // namespace lai_franka_controllers
 
 // Export the class to ROS 2 Pluginlib
-PLUGINLIB_EXPORT_CLASS(my_franka_controllers::CartesianVelocityController, controller_interface::ControllerInterface)
+PLUGINLIB_EXPORT_CLASS(lai_franka_controllers::CartesianVelocityController, controller_interface::ControllerInterface)

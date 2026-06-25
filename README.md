@@ -1,4 +1,4 @@
-# My Franka ROS 2 Controllers
+# LAI Franka ROS 2 Controllers
 
 This package implements an advanced suite of real-time Cartesian motion controllers and trajectory planning nodes for the Franka Emika FR3 manipulator using the ros2_control framework. 
 
@@ -42,7 +42,7 @@ cd ~/franka_ros2_ws/
 colcon build --symlink-install
 
 # Mandatory: Build the controllers package in Release mode
-colcon build --packages-select my_franka_controllers --cmake-args -DCMAKE_BUILD_TYPE=Release
+colcon build --packages-select lai_franka_controllers --cmake-args -DCMAKE_BUILD_TYPE=Release
 
 # Source the workspace
 source install/setup.bash
@@ -82,7 +82,7 @@ ros2 topic pub -1 /my_hqp_cartesian_controller/target_pose geometry_msgs/msg/Pos
 Instead of step-inputs via CLI, use the generator to feed smooth S-curves to the controller:
 
 ```bash
-ros2 run my_franka_controllers trajectory_generator_node
+ros2 run lai_franka_controllers trajectory_generator_node
 
 ```
 
@@ -95,10 +95,10 @@ If running inside WSL2 where standard `/dev/input/js0` is unavailable, use the r
 
 ```bash
 # Run the raw USB reader (requires Logitech F310/F710 in X-Input mode)
-ros2 run my_franka_controllers raw_usb_joy_node
+ros2 run lai_franka_controllers raw_usb_joy_node
 
 # Run the teleop integration node in a separate terminal
-ros2 run my_franka_controllers joy_teleop_node
+ros2 run lai_franka_controllers joy_teleop_node
 
 ```
 

@@ -1,5 +1,5 @@
-#ifndef MY_FRANKA_CONTROLLERS__HQP_REFERENCE_GENERATOR_NODE_HPP_
-#define MY_FRANKA_CONTROLLERS__HQP_REFERENCE_GENERATOR_NODE_HPP_
+#ifndef LAI_FRANKA_CONTROLLERS__HQP_REFERENCE_GENERATOR_NODE_HPP_
+#define LAI_FRANKA_CONTROLLERS__HQP_REFERENCE_GENERATOR_NODE_HPP_
 
 #include <memory>
 #include <string>
@@ -19,7 +19,7 @@
 #include <hierarchical_qp/hierarchicalQP.h>
 #include <robot_kinematics/FrankaKinematics.hpp>
 
-namespace my_franka_controllers {
+namespace lai_franka_controllers {
 
 class HqpReferenceGeneratorNode : public rclcpp::Node {
 public:
@@ -81,6 +81,6 @@ private:
     Eigen::Matrix<double, 7, 1> dq_limit;
 };
 
-}  // namespace my_franka_controllers
+}  // namespace lai_franka_controllers
 
-#endif // MY_FRANKA_CONTROLLERS__HQP_REFERENCE_GENERATOR_NODE_HPP_
+#endif // LAI_FRANKA_CONTROLLERS__HQP_REFERENCE_GENERATOR_NODE_HPP_

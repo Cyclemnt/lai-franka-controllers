@@ -1,5 +1,5 @@
-#ifndef MY_FRANKA_CONTROLLERS__CARTESIAN_REFERENCE_GENERATOR_NODE_HPP_
-#define MY_FRANKA_CONTROLLERS__CARTESIAN_REFERENCE_GENERATOR_NODE_HPP_
+#ifndef LAI_FRANKA_CONTROLLERS__CARTESIAN_REFERENCE_GENERATOR_NODE_HPP_
+#define LAI_FRANKA_CONTROLLERS__CARTESIAN_REFERENCE_GENERATOR_NODE_HPP_
 
 #include <memory>
 #include <string>
@@ -18,7 +18,7 @@
 #include <pinocchio/multibody/model.hpp>
 #include <pinocchio/multibody/data.hpp>
 
-namespace my_franka_controllers {
+namespace lai_franka_controllers {
 
 class CartesianReferenceGeneratorNode : public rclcpp::Node {
 public:
@@ -108,6 +108,6 @@ private:
     Eigen::Matrix<double, 7, 1> dq_cmd_prev;
 };
 
-}  // namespace my_franka_controllers
+}  // namespace lai_franka_controllers
 
-#endif  // MY_FRANKA_CONTROLLERS__CARTESIAN_REFERENCE_GENERATOR_NODE_HPP_
+#endif  // LAI_FRANKA_CONTROLLERS__CARTESIAN_REFERENCE_GENERATOR_NODE_HPP_

@@ -1,8 +1,8 @@
-#include "my_franka_controllers/joy_teleop_node.hpp"
+#include "lai_franka_controllers/joy_teleop_node.hpp"
 #include "geometry_msgs/msg/transform_stamped.hpp"
 #include "tf2/exceptions.h"
 
-namespace my_franka_controllers {
+namespace lai_franka_controllers {
 
 JoyTeleopNode::JoyTeleopNode(const rclcpp::NodeOptions & options)
     : Node("joy_teleop_node", options)
@@ -164,11 +164,11 @@ void JoyTeleopNode::timer_callback() {
     pose_pub->publish(pose_msg);
 }
 
-}  // namespace my_franka_controllers
+}  // namespace lai_franka_controllers
 
 int main(int argc, char * argv[]) {
     rclcpp::init(argc, argv);
-    auto node = std::make_shared<my_franka_controllers::JoyTeleopNode>();
+    auto node = std::make_shared<lai_franka_controllers::JoyTeleopNode>();
     rclcpp::spin(node);
     rclcpp::shutdown();
     return 0;

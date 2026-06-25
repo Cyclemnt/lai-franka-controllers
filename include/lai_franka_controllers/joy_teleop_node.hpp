@@ -1,5 +1,5 @@
-#ifndef MY_FRANKA_CONTROLLERS__JOY_TELEOP_NODE_HPP_
-#define MY_FRANKA_CONTROLLERS__JOY_TELEOP_NODE_HPP_
+#ifndef LAI_FRANKA_CONTROLLERS__JOY_TELEOP_NODE_HPP_
+#define LAI_FRANKA_CONTROLLERS__JOY_TELEOP_NODE_HPP_
 
 #include <memory>
 #include <string>
@@ -16,7 +16,7 @@
 #include "tf2/LinearMath/Matrix3x3.h"
 #include "tf2/LinearMath/Vector3.h"
 
-namespace my_franka_controllers {
+namespace lai_franka_controllers {
 
 class JoyTeleopNode : public rclcpp::Node {
 public:
@@ -52,6 +52,6 @@ private:
     bool is_initialized{false};
 };
 
-}  // namespace my_franka_controllers
+}  // namespace lai_franka_controllers
 
-#endif  // MY_FRANKA_CONTROLLERS__JOY_TELEOP_NODE_HPP_
+#endif  // LAI_FRANKA_CONTROLLERS__JOY_TELEOP_NODE_HPP_

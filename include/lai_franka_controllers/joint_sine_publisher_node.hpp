@@ -1,5 +1,5 @@
-#ifndef MY_FRANKA_CONTROLLERS__JOINT_SINE_PUBLISHER_NODE_HPP_
-#define MY_FRANKA_CONTROLLERS__JOINT_SINE_PUBLISHER_NODE_HPP_
+#ifndef LAI_FRANKA_CONTROLLERS__JOINT_SINE_PUBLISHER_NODE_HPP_
+#define LAI_FRANKA_CONTROLLERS__JOINT_SINE_PUBLISHER_NODE_HPP_
 
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
@@ -8,7 +8,7 @@
 #include <chrono>
 #include <mutex>
 
-namespace my_franka_controllers {
+namespace lai_franka_controllers {
 
 class JointSinePublisherNode : public rclcpp::Node {
 public:
@@ -38,6 +38,6 @@ private:
     std::vector<double> frequencies_;
 };
 
-} // namespace my_franka_controllers
+} // namespace lai_franka_controllers
 
-#endif // MY_FRANKA_CONTROLLERS__JOINT_SINE_PUBLISHER_NODE_HPP_
+#endif // LAI_FRANKA_CONTROLLERS__JOINT_SINE_PUBLISHER_NODE_HPP_

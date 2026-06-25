@@ -5,7 +5,7 @@ from launch_ros.actions import Node
 from launch.actions import SetEnvironmentVariable
 
 def generate_launch_description():
-    pkg_share_dir = get_package_share_directory('my_franka_controllers')
+    pkg_share_dir = get_package_share_directory('lai_franka_controllers')
     teleop_params = os.path.join(pkg_share_dir, 'config', 'teleop_params.yaml')
 
     force_color_env = SetEnvironmentVariable('RCUTILS_COLORIZED_OUTPUT', '1')
@@ -24,7 +24,7 @@ def generate_launch_description():
 
     # or custom compiled Libusb binary
     # joy_driver_node = Node(
-    #     package='my_franka_controllers',
+    #     package='lai_franka_controllers',
     #     executable='raw_usb_joy_node',
     #     name='joy_node',
     #     output='screen'
@@ -32,7 +32,7 @@ def generate_launch_description():
 
     # Custom Teleop Translator Node
     joy_teleop_node = Node(
-        package='my_franka_controllers',
+        package='lai_franka_controllers',
         executable='joy_teleop_node',
         name='joy_teleop_node',
         parameters=[teleop_params],

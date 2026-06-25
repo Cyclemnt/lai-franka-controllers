@@ -1,9 +1,9 @@
-#include "my_franka_controllers/hqp_reference_generator_node.hpp"
+#include "lai_franka_controllers/hqp_reference_generator_node.hpp"
 #include <chrono>
 
 using namespace std::chrono_literals;
 
-namespace my_franka_controllers {
+namespace lai_franka_controllers {
 
 HqpReferenceGeneratorNode::HqpReferenceGeneratorNode() : Node("hqp_reference_generator_node") {
     
@@ -257,11 +257,11 @@ void HqpReferenceGeneratorNode::timer_callback() {
     }
 }
 
-} // namespace my_franka_controllers
+} // namespace lai_franka_controllers
 
 int main(int argc, char * argv[]) {
     rclcpp::init(argc, argv);
-    rclcpp::spin(std::make_shared<my_franka_controllers::HqpReferenceGeneratorNode>());
+    rclcpp::spin(std::make_shared<lai_franka_controllers::HqpReferenceGeneratorNode>());
     rclcpp::shutdown();
     return 0;
 }

@@ -1,4 +1,4 @@
-#include "my_franka_controllers/cartesian_reference_generator_node.hpp"
+#include "lai_franka_controllers/cartesian_reference_generator_node.hpp"
 #include <pinocchio/parsers/urdf.hpp>
 #include <pinocchio/algorithm/kinematics.hpp>
 #include <pinocchio/algorithm/frames.hpp>
@@ -7,7 +7,7 @@
 
 using namespace std::chrono_literals;
 
-namespace my_franka_controllers {
+namespace lai_franka_controllers {
 
 CartesianReferenceGeneratorNode::CartesianReferenceGeneratorNode() : Node("cartesian_reference_generator_node") {
     
@@ -67,7 +67,7 @@ CartesianReferenceGeneratorNode::CartesianReferenceGeneratorNode() : Node("carte
     joint_state_sub_ = this->create_subscription<sensor_msgs::msg::JointState>("/joint_states", 10, std::bind(&CartesianReferenceGeneratorNode::joint_state_callback, this, std::placeholders::_1));
 
     int timer_ms = std::max(1, static_cast<int>(1000.0 / control_frequency_));
-    timer_ = this->create_timer(this->get_clock(), std::chrono::milliseconds(timer_ms), std::bind(&CartesianReferenceGeneratorNode::timer_callback, this));
+    timer_ = this->create_wall_timer(std::chrono::milliseconds(timer_ms), std::bind(&CartesianReferenceGeneratorNode::timer_callback, this));
 
     RCLCPP_INFO(this->get_logger(), "Waiting for initial /joint_states to align the CLIK virtual model...");
 }
@@ -270,11 +270,11 @@ void CartesianReferenceGeneratorNode::timer_callback() {
     joint_cmd_pub_->publish(joint_msg);
 }
 
-} // namespace my_franka_controllers
+} // namespace lai_franka_controllers
 
 int main(int argc, char * argv[]) {
     rclcpp::init(argc, argv);
-    rclcpp::spin(std::make_shared<my_franka_controllers::CartesianReferenceGeneratorNode>());
+    rclcpp::spin(std::make_shared<lai_franka_controllers::CartesianReferenceGeneratorNode>());
     rclcpp::shutdown();
     return 0;
 }

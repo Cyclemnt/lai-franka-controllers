@@ -1,8 +1,8 @@
-#include "my_franka_controllers/joint_pd_velocity_controller.hpp"
+#include "lai_franka_controllers/joint_pd_velocity_controller.hpp"
 #include <pluginlib/class_list_macros.hpp>
 #include <hardware_interface/types/hardware_interface_type_values.hpp>
 
-namespace my_franka_controllers {
+namespace lai_franka_controllers {
 
 // -------------------------------------------------------------------------
 // on_init
@@ -184,7 +184,7 @@ controller_interface::return_type JointPdVelocityController::update(const rclcpp
 
     // Publish commands for debugging
     if (rt_dq_cmd_pub && rt_dq_cmd_pub->trylock()) {
-        rt_dq_cmd_pub->msg_.header.stamp = time;
+        rt_dq_cmd_pub->msg_.header.stamp = get_node()->get_clock()->now();
         for (size_t i = 0; i < 7; ++i) rt_dq_cmd_pub->msg_.velocity[i] = dq_cmd(i);
         rt_dq_cmd_pub->unlockAndPublish();
     }
@@ -192,6 +192,6 @@ controller_interface::return_type JointPdVelocityController::update(const rclcpp
     return controller_interface::return_type::OK;
 }
 
-} // namespace my_franka_controllers
+} // namespace lai_franka_controllers
 
-PLUGINLIB_EXPORT_CLASS(my_franka_controllers::JointPdVelocityController, controller_interface::ControllerInterface)
+PLUGINLIB_EXPORT_CLASS(lai_franka_controllers::JointPdVelocityController, controller_interface::ControllerInterface)

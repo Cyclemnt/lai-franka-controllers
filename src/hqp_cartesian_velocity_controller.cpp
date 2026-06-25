@@ -1,8 +1,8 @@
-#include "my_franka_controllers/hqp_cartesian_velocity_controller.hpp"
+#include "lai_franka_controllers/hqp_cartesian_velocity_controller.hpp"
 #include <pluginlib/class_list_macros.hpp>
 #include <hardware_interface/types/hardware_interface_type_values.hpp>
 
-namespace my_franka_controllers {
+namespace lai_franka_controllers {
 
 // -------------------------------------------------------------------------
 // on_init
@@ -368,6 +368,6 @@ controller_interface::return_type HqpCartesianVelocityController::update(const r
     return controller_interface::return_type::OK;
 }
 
-} // namespace my_franka_controllers
+} // namespace lai_franka_controllers
 
-PLUGINLIB_EXPORT_CLASS(my_franka_controllers::HqpCartesianVelocityController, controller_interface::ControllerInterface)
+PLUGINLIB_EXPORT_CLASS(lai_franka_controllers::HqpCartesianVelocityController, controller_interface::ControllerInterface)

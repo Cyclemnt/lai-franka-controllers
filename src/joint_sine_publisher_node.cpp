@@ -1,9 +1,9 @@
-#include "my_franka_controllers/joint_sine_publisher_node.hpp"
+#include "lai_franka_controllers/joint_sine_publisher_node.hpp"
 #include <cmath>
 
 using namespace std::chrono_literals;
 
-namespace my_franka_controllers {
+namespace lai_franka_controllers {
 
 JointSinePublisherNode::JointSinePublisherNode() : Node("joint_sine_publisher") {
     
@@ -113,11 +113,11 @@ void JointSinePublisherNode::timer_callback() {
     publisher_->publish(msg);
 }
 
-} // namespace my_franka_controllers
+} // namespace lai_franka_controllers
 
 int main(int argc, char * argv[]) {
     rclcpp::init(argc, argv);
-    rclcpp::spin(std::make_shared<my_franka_controllers::JointSinePublisherNode>());
+    rclcpp::spin(std::make_shared<lai_franka_controllers::JointSinePublisherNode>());
     rclcpp::shutdown();
     return 0;
 }

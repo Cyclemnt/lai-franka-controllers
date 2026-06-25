@@ -1,5 +1,5 @@
-#ifndef MY_FRANKA_CONTROLLERS__JOINT_PD_VELOCITY_CONTROLLER_HPP_
-#define MY_FRANKA_CONTROLLERS__JOINT_PD_VELOCITY_CONTROLLER_HPP_
+#ifndef LAI_FRANKA_CONTROLLERS__JOINT_PD_VELOCITY_CONTROLLER_HPP_
+#define LAI_FRANKA_CONTROLLERS__JOINT_PD_VELOCITY_CONTROLLER_HPP_
 
 #include <memory>
 #include <string>
@@ -17,7 +17,7 @@
 // Eigen
 #include <Eigen/Dense>
 
-namespace my_franka_controllers {
+namespace lai_franka_controllers {
 
 class JointPdVelocityController : public controller_interface::ControllerInterface {
 public:
@@ -67,6 +67,6 @@ private:
     Eigen::VectorXd prev_dq_cmd;
 };
 
-}  // namespace my_franka_controllers
+}  // namespace lai_franka_controllers
 
-#endif // MY_FRANKA_CONTROLLERS__JOINT_PD_VELOCITY_CONTROLLER_HPP_
+#endif // LAI_FRANKA_CONTROLLERS__JOINT_PD_VELOCITY_CONTROLLER_HPP_

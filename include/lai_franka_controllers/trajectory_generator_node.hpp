@@ -1,5 +1,5 @@
-#ifndef MY_FRANKA_CONTROLLERS__TRAJECTORY_GENERATOR_NODE_HPP_
-#define MY_FRANKA_CONTROLLERS__TRAJECTORY_GENERATOR_NODE_HPP_
+#ifndef LAI_FRANKA_CONTROLLERS__TRAJECTORY_GENERATOR_NODE_HPP_
+#define LAI_FRANKA_CONTROLLERS__TRAJECTORY_GENERATOR_NODE_HPP_
 
 #include <rclcpp/rclcpp.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
@@ -8,7 +8,7 @@
 #include <Eigen/Dense>
 #include <vector>
 
-namespace my_franka_controllers {
+namespace lai_franka_controllers {
 
 class TrajectoryGenerator : public rclcpp::Node {
 public:
@@ -57,6 +57,6 @@ private:
     Eigen::Quaterniond q_start, q_goal;
 };
 
-} // namespace my_franka_controllers
+} // namespace lai_franka_controllers
 
-#endif // MY_FRANKA_CONTROLLERS__TRAJECTORY_GENERATOR_NODE_HPP_
+#endif // LAI_FRANKA_CONTROLLERS__TRAJECTORY_GENERATOR_NODE_HPP_

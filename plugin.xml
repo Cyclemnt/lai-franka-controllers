@@ -1,22 +1,22 @@
-<library path="my_franka_controllers">
-  <class name="my_franka_controllers/CartesianVelocityController" 
-         type="my_franka_controllers::CartesianVelocityController" 
+<library path="lai_franka_controllers">
+  <class name="lai_franka_controllers/CartesianVelocityController" 
+         type="lai_franka_controllers::CartesianVelocityController" 
          base_class_type="controller_interface::ControllerInterface">
     <description>
       Cartesian Velocity Controller using Pinocchio and Eigen.
     </description>
   </class>
 
-  <class name="my_franka_controllers/HqpCartesianVelocityController" 
-         type="my_franka_controllers::HqpCartesianVelocityController" 
+  <class name="lai_franka_controllers/HqpCartesianVelocityController" 
+         type="lai_franka_controllers::HqpCartesianVelocityController" 
          base_class_type="controller_interface::ControllerInterface">
     <description>
       Hierarchical QP Cartesian Velocity Controller using Gurobi and FrankaKinematics.
     </description>
   </class>
 
-  <class name="my_franka_controllers/JointPdVelocityController" 
-         type="my_franka_controllers::JointPdVelocityController" 
+  <class name="lai_franka_controllers/JointPdVelocityController" 
+         type="lai_franka_controllers::JointPdVelocityController" 
          base_class_type="controller_interface::ControllerInterface">
     <description>
       Low-level Joint PD Feedforward Controller with ZOH capabilities.

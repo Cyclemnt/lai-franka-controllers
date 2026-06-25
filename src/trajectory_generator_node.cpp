@@ -1,8 +1,8 @@
-#include "my_franka_controllers/trajectory_generator_node.hpp"
+#include "lai_franka_controllers/trajectory_generator_node.hpp"
 
 using namespace std::chrono_literals;
 
-namespace my_franka_controllers {
+namespace lai_franka_controllers {
 
 TrajectoryGenerator::TrajectoryGenerator() : Node("trajectory_generator") {
     cmd_pub = this->create_publisher<geometry_msgs::msg::PoseStamped>("/hqp_reference_generator_node/target_pose", 10);
@@ -119,11 +119,11 @@ void TrajectoryGenerator::timer_callback() {
     }
 }
 
-} // namespace my_franka_controllers
+} // namespace lai_franka_controllers
 
 int main(int argc, char **argv) {
     rclcpp::init(argc, argv);
-    rclcpp::spin(std::make_shared<my_franka_controllers::TrajectoryGenerator>());
+    rclcpp::spin(std::make_shared<lai_franka_controllers::TrajectoryGenerator>());
     rclcpp::shutdown();
     return 0;
 }

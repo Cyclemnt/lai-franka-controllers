@@ -1,5 +1,5 @@
-#ifndef MY_FRANKA_CONTROLLERS__HQP_CARTESIAN_VELOCITY_CONTROLLER_HPP_
-#define MY_FRANKA_CONTROLLERS__HQP_CARTESIAN_VELOCITY_CONTROLLER_HPP_
+#ifndef LAI_FRANKA_CONTROLLERS__HQP_CARTESIAN_VELOCITY_CONTROLLER_HPP_
+#define LAI_FRANKA_CONTROLLERS__HQP_CARTESIAN_VELOCITY_CONTROLLER_HPP_
 
 #include <memory>
 #include <string>
@@ -24,7 +24,7 @@
 #include <hierarchical_qp/hierarchicalQP.h>
 #include <robot_kinematics/FrankaKinematics.hpp>
 
-namespace my_franka_controllers {
+namespace lai_franka_controllers {
 
 class HqpCartesianVelocityController : public controller_interface::ControllerInterface {
 public:
@@ -104,6 +104,6 @@ private:
     rclcpp::Time last_target_time{0};
 };
 
-}  // namespace my_franka_controllers
+}  // namespace lai_franka_controllers
 
-#endif // MY_FRANKA_CONTROLLERS__HQP_CARTESIAN_VELOCITY_CONTROLLER_HPP_
+#endif // LAI_FRANKA_CONTROLLERS__HQP_CARTESIAN_VELOCITY_CONTROLLER_HPP_

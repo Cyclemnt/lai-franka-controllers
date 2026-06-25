@@ -1,4 +1,4 @@
-#include "my_franka_controllers/raw_usb_joy_node.hpp"
+#include "lai_franka_controllers/raw_usb_joy_node.hpp"
 #include <stdexcept>
 #include <algorithm>
 

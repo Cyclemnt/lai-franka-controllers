@@ -44,8 +44,8 @@ controller_interface::CallbackReturn JointPdVelocityController::on_configure(con
     
     k_gains = Eigen::VectorXd::Map(k_gains_std.data(), num_joints);
     timeout_sec = node->get_parameter("timeout_sec").as_double();
-    smoothing_iterations = node->get_parameter("smoothing_iterations").as_int();
-    max_allowed_dv = node->get_parameter("max_allowed_dv").as_double();
+    // smoothing_iterations = node->get_parameter("smoothing_iterations").as_int();
+    // max_allowed_dv = node->get_parameter("max_allowed_dv").as_double();
 
     // Resize Math Vectors
     q_current.resize(num_joints);
@@ -169,11 +169,11 @@ controller_interface::return_type JointPdVelocityController::update(const rclcpp
         dq_cmd = k_gains.cwiseProduct(target->q_d - q_current) + target->dq_d;
     }
 
-    // Safety Smoothing: If difference between samples is too high, smooth it out
-    Eigen::VectorXd delta_dq = dq_cmd - prev_dq_cmd;
-    if (delta_dq.cwiseAbs().maxCoeff() > max_allowed_dv) {
-        dq_cmd = prev_dq_cmd + delta_dq / static_cast<double>(smoothing_iterations);
-    }
+    // // Safety Smoothing: If difference between samples is too high, smooth it out
+    // Eigen::VectorXd delta_dq = dq_cmd - prev_dq_cmd;
+    // if (delta_dq.cwiseAbs().maxCoeff() > max_allowed_dv) {
+    //     dq_cmd = prev_dq_cmd + delta_dq / static_cast<double>(smoothing_iterations);
+    // }
     
     prev_dq_cmd = dq_cmd;
 

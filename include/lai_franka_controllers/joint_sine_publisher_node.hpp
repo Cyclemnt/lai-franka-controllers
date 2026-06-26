@@ -19,23 +19,19 @@ private:
     void timer_callback();
     void joint_state_callback(const sensor_msgs::msg::JointState::SharedPtr msg);
 
-    rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr publisher_;
-    rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_sub_;
-    rclcpp::TimerBase::SharedPtr timer_;
+    rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr publisher;
+    rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_sub;
+    rclcpp::TimerBase::SharedPtr timer;
     
-    rclcpp::Time start_time_;
-    bool is_initialized_{false};
-    std::mutex data_mutex_;
+    rclcpp::Time start_time;
+    bool is_initialized{false};
+    std::mutex data_mutex;
 
-    // Delay variables
-    int iteration_count_{0};
-    int n_delay_iterations_{1}; // Wait for n iterations before starting the sine wave
-
-    std::vector<std::string> joint_names_;
-    std::vector<double> initial_positions_;
-    std::vector<double> current_positions_; // Added to track live hardware state
-    std::vector<double> amplitudes_;
-    std::vector<double> frequencies_;
+    std::vector<std::string> joint_names;
+    std::vector<double> initial_positions;
+    std::vector<double> current_positions; // Added to track live hardware state
+    std::vector<double> amplitudes;
+    std::vector<double> frequencies;
 };
 
 } // namespace lai_franka_controllers

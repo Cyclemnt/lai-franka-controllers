@@ -56,7 +56,7 @@ controller_interface::CallbackReturn JointPdVelocityController::on_configure(con
     prev_dq_cmd.setZero();
 
     // Setup dq_cmd publisher
-    dq_cmd_pub = get_node()->create_publisher<sensor_msgs::msg::JointState>("~/llc_output_dq_cmd", rclcpp::SystemDefaultsQoS());
+    dq_cmd_pub = get_node()->create_publisher<sensor_msgs::msg::JointState>("~/output_dq_cmd", rclcpp::SystemDefaultsQoS());
     rt_dq_cmd_pub = std::make_shared<realtime_tools::RealtimePublisher<sensor_msgs::msg::JointState>>(dq_cmd_pub);
     rt_dq_cmd_pub->msg_.velocity.resize(7);
     rt_dq_cmd_pub->msg_.name = joint_names;
@@ -78,10 +78,9 @@ controller_interface::CallbackReturn JointPdVelocityController::on_configure(con
             TargetJointState target;
             target.q_d = Eigen::VectorXd::Map(msg->position.data(), num_joints);
             target.dq_d = Eigen::VectorXd::Map(msg->velocity.data(), num_joints);
-            // Use message timestamp if available, otherwise node time
-            target.timestamp = msg->header.stamp.sec == 0 ? this->get_node()->now() : rclcpp::Time(msg->header.stamp);
+            target.timestamp = rclcpp::Time(msg->header.stamp);
             target.valid = true;
-
+std::cout << "recieved" << std::endl;
             rt_command_ptr.writeFromNonRT(target);
         });
 
@@ -169,11 +168,17 @@ controller_interface::return_type JointPdVelocityController::update(const rclcpp
         dq_cmd = k_gains.cwiseProduct(target->q_d - q_current) + target->dq_d;
     }
 
-    // // Safety Smoothing: If difference between samples is too high, smooth it out
-    // Eigen::VectorXd delta_dq = dq_cmd - prev_dq_cmd;
-    // if (delta_dq.cwiseAbs().maxCoeff() > max_allowed_dv) {
-    //     dq_cmd = prev_dq_cmd + delta_dq / static_cast<double>(smoothing_iterations);
-    // }
+    // If difference between samples is too high, clamp
+    for (size_t i = 0; i < num_joints; ++i) {
+        double delta = dq_cmd(i) - prev_dq_cmd(i);
+        if (std::abs(delta) > 0.005) {
+            if (delta > 0) {
+                dq_cmd(i) = prev_dq_cmd(i) + 0.003;
+            } else {
+                dq_cmd(i) = prev_dq_cmd(i) - 0.003;
+            }
+        }
+    }
     
     prev_dq_cmd = dq_cmd;
 

@@ -56,6 +56,7 @@ private:
     double timeout_sec{0.1};
     // int smoothing_iterations{10};
     // double max_allowed_dv{0.001};
+    Eigen::VectorXd prev_dq_cmd;
 
     // Subscription and Realtime Buffer
     rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_command_sub;

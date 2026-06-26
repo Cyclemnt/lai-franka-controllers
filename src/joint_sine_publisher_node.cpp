@@ -13,7 +13,7 @@ JointSinePublisherNode::JointSinePublisherNode() : Node("joint_sine_publisher") 
 
     publisher = this->create_publisher<sensor_msgs::msg::JointState>(target_topic, 10);
     
-    // Subscribe to capture the initial position AND keep tracking current position
+    // Subscribe to capture the initial position and track current position
     joint_sub = this->create_subscription<sensor_msgs::msg::JointState>("/joint_states", 10, std::bind(&JointSinePublisherNode::joint_state_callback, this, std::placeholders::_1));
 
     joint_names = {"fr3_joint1", "fr3_joint2", "fr3_joint3", "fr3_joint4", "fr3_joint5", "fr3_joint6", "fr3_joint7"};
@@ -54,7 +54,6 @@ void JointSinePublisherNode::joint_state_callback(const sensor_msgs::msg::JointS
             start_time = this->get_clock()->now();
             is_initialized = true;
             
-            // Note: We NO LONGER destroy the subscriber so we can keep updating current_positions_
             RCLCPP_INFO(this->get_logger(), "Initial positions captured. Waiting for PD controller subscription.");
         }
     }
@@ -75,17 +74,17 @@ void JointSinePublisherNode::timer_callback() {
     std::lock_guard<std::mutex> lock(data_mutex);
     
     // Wait for subscription
-    if (publisher->get_subscription_count() == 0) {
-        for (size_t i = 0; i < 7; ++i) {
-            msg.position[i] = initial_positions[i];
-            msg.velocity[i] = 0.0;
-        }
+    // if (publisher->get_subscription_count() == 0) {
+    //     for (size_t i = 0; i < 7; ++i) {
+    //         msg.position[i] = initial_positions[i];
+    //         msg.velocity[i] = 0.0;
+    //     }
         
-        // Reset start time continuously during the delay so that t=0 when the sine finally starts
-        start_time = current_time;
-        RCLCPP_INFO(this->get_logger(), "Waiting.");
-    } 
-    else {
+    //     // Reset start time continuously during the delay so that t=0 when the sine finally starts
+    //     start_time = current_time;
+    //     RCLCPP_INFO(this->get_logger(), "Waiting.");
+    // } 
+    // else {
         // Standard Sine trajectory computation
         double t = (current_time - start_time).seconds();
         for (size_t i = 0; i < 7; ++i) {
@@ -107,7 +106,7 @@ void JointSinePublisherNode::timer_callback() {
             }
         }
         RCLCPP_INFO(this->get_logger(), "Max tracking error: %.5f rad", max_tracking_error);
-    }
+    // }
 
     publisher->publish(msg);
 }

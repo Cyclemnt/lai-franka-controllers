@@ -93,7 +93,7 @@ controller_interface::CallbackReturn HqpCartesianVelocityController::on_configur
     sefhits_safe_points << 6; // End-effector
     Eigen::VectorXi sefhits_avoid_points(2);
     sefhits_avoid_points << 0, 3; // Base and Elbow
-    double selfhits_min_dist = 0.2; // Keep EE at least 40 cm away from the base
+    double selfhits_min_dist = 0.2; // Keep EE at least x cm away from the base
     self_collision_task = std::make_shared<SelfHits>(kinematics.get(), sefhits_safe_points, sefhits_avoid_points, selfhits_min_dist, GRB_GREATER_EQUAL, 1.0);
     self_collision_task->setPriorityLevel(2);
     self_collision_task->setSlacksState(false);

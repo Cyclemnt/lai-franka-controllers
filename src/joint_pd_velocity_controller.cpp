@@ -15,7 +15,7 @@ controller_interface::CallbackReturn JointPdVelocityController::on_init() {
     node->declare_parameter("joint_names", joint_names);
 
     // Default K gains (yaml possible)
-    std::vector<double> default_k_gains(7, 0.0);
+    std::vector<double> default_k_gains(7, 0.9);
     node->declare_parameter("k_gains", default_k_gains);
 
     // Timeout and Smoothing parameters
@@ -44,7 +44,6 @@ controller_interface::CallbackReturn JointPdVelocityController::on_configure(con
     
     k_gains = Eigen::VectorXd::Map(k_gains_std.data(), num_joints);
     timeout_sec = node->get_parameter("timeout_sec").as_double();
-    // smoothing_iterations = node->get_parameter("smoothing_iterations").as_int();
     // max_allowed_dv = node->get_parameter("max_allowed_dv").as_double();
 
     // Resize Math Vectors
@@ -80,7 +79,7 @@ controller_interface::CallbackReturn JointPdVelocityController::on_configure(con
             target.dq_d = Eigen::VectorXd::Map(msg->velocity.data(), num_joints);
             target.timestamp = rclcpp::Time(msg->header.stamp);
             target.valid = true;
-std::cout << "recieved" << std::endl;
+
             rt_command_ptr.writeFromNonRT(target);
         });
 
@@ -168,19 +167,18 @@ controller_interface::return_type JointPdVelocityController::update(const rclcpp
         dq_cmd = k_gains.cwiseProduct(target->q_d - q_current) + target->dq_d;
     }
 
-    // If difference between samples is too high, clamp
-    for (size_t i = 0; i < num_joints; ++i) {
-        double delta = dq_cmd(i) - prev_dq_cmd(i);
-        if (std::abs(delta) > 0.005) {
-            if (delta > 0) {
-                dq_cmd(i) = prev_dq_cmd(i) + 0.003;
-            } else {
-                dq_cmd(i) = prev_dq_cmd(i) - 0.003;
-            }
-        }
-    }
-    
-    prev_dq_cmd = dq_cmd;
+    // // If difference between samples is too high, clamp
+    // for (size_t i = 0; i < num_joints; ++i) {
+    //     double delta = dq_cmd(i) - prev_dq_cmd(i);
+    //     if (std::abs(delta) > max_allowed_dv) {
+    //         if (delta > 0) {
+    //             dq_cmd(i) = prev_dq_cmd(i) + 0.003;
+    //         } else {
+    //             dq_cmd(i) = prev_dq_cmd(i) - 0.003;
+    //         }
+    //     }
+    // }
+    // prev_dq_cmd = dq_cmd;
 
     // Write to Hardware Interfaces
     for (size_t i = 0; i < num_joints; ++i) {

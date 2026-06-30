@@ -54,9 +54,8 @@ private:
 
     // Safety & Smoothing Parameters
     double timeout_sec{0.1};
-    // int smoothing_iterations{10};
-    // double max_allowed_dv{0.001};
-    Eigen::VectorXd prev_dq_cmd;
+    // double max_allowed_dv{0.005};
+    // Eigen::VectorXd prev_dq_cmd;
 
     // Subscription and Realtime Buffer
     rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_command_sub;
@@ -65,7 +64,6 @@ private:
     // Math Variables
     Eigen::VectorXd q_current;
     Eigen::VectorXd dq_cmd;
-    Eigen::VectorXd prev_dq_cmd;
 };
 
 }  // namespace lai_franka_controllers

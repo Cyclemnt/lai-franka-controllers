@@ -29,7 +29,7 @@ private:
 
     std::vector<std::string> joint_names;
     std::vector<double> initial_positions;
-    std::vector<double> current_positions; // Added to track live hardware state
+    std::vector<double> current_positions;
     std::vector<double> amplitudes;
     std::vector<double> frequencies;
 };

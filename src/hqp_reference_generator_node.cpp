@@ -54,52 +54,80 @@ HqpReferenceGeneratorNode::HqpReferenceGeneratorNode() : Node("hqp_reference_gen
     kinematics->getSelectDOF()->assign(7, true);
     kinematics->getSelectTask()->assign(6, true);
 
-    solver = std::make_shared<HierarchicalQP>(7, GRB_CONTINUOUS);
-    
-    // Task Creation
+    // Create Tasks
+    // Joints configuration task
     q_upper_task = std::make_shared<JointsConfigurationLimits>(kinematics.get(), q_max, GRB_LESS_EQUAL, 1.0);
     q_lower_task = std::make_shared<JointsConfigurationLimits>(kinematics.get(), q_min, GRB_GREATER_EQUAL, 1.0);
-    q_upper_task->setPriorityLevel(1); q_upper_task->setSlacksState(false);
-    q_lower_task->setPriorityLevel(1); q_lower_task->setSlacksState(false);
-    task_stack.push_back(q_upper_task); task_stack.push_back(q_lower_task);
+    q_upper_task->setPriorityLevel(1);
+    q_lower_task->setPriorityLevel(1);
+    q_upper_task->setSlacksState(false);
+    q_lower_task->setSlacksState(false);
+    task_stack.push_back(q_upper_task);
+    task_stack.push_back(q_lower_task);
     
+    // Joints velocity task
     dq_upper_task = std::make_shared<JointsVelocityLimits>(kinematics.get(), dq_limit, GRB_LESS_EQUAL, 1.0);
     dq_lower_task = std::make_shared<JointsVelocityLimits>(kinematics.get(), -dq_limit, GRB_GREATER_EQUAL, 1.0);
-    dq_upper_task->setPriorityLevel(1); dq_upper_task->setSlacksState(false);
-    dq_lower_task->setPriorityLevel(1); dq_lower_task->setSlacksState(false);
-    task_stack.push_back(dq_upper_task); task_stack.push_back(dq_lower_task);
+    dq_upper_task->setPriorityLevel(1);
+    dq_lower_task->setPriorityLevel(1);
+    dq_upper_task->setSlacksState(false);
+    dq_lower_task->setSlacksState(false);
+    task_stack.push_back(dq_upper_task);
+    task_stack.push_back(dq_lower_task);
     
-    Eigen::VectorXi sefhits_safe_points(1); sefhits_safe_points << 6;
-    Eigen::VectorXi sefhits_avoid_points(2); sefhits_avoid_points << 0, 3;
-    self_collision_task = std::make_shared<SelfHits>(kinematics.get(), sefhits_safe_points, sefhits_avoid_points, 0.35, GRB_GREATER_EQUAL, 1.0);
-    self_collision_task->setPriorityLevel(2); self_collision_task->setSlacksState(false);
+    // Self hits task
+    Eigen::VectorXi sefhits_safe_points(1);
+    sefhits_safe_points << 6; // End-effector
+    Eigen::VectorXi sefhits_avoid_points(2);
+    sefhits_avoid_points << 0, 3; // Base and Elbow
+    double selfhits_min_dist = 0.2; // Keep EE at least x cm away from the base
+    self_collision_task = std::make_shared<SelfHits>(kinematics.get(), sefhits_safe_points, sefhits_avoid_points, selfhits_min_dist, GRB_GREATER_EQUAL, 1.0);
+    self_collision_task->setPriorityLevel(2);
+    self_collision_task->setSlacksState(false);
     task_stack.push_back(self_collision_task);
 
-    Eigen::VectorXi joints_to_protect_from_walls(2); joints_to_protect_from_walls << 3, 7; 
-    Eigen::Vector3d f1(0,0,0.05), f2(1,0,0.05), f3(0,1,0.05);
-    virtual_wall_task_1 = std::make_shared<VirtualWall>(kinematics.get(), f1, f2, f3, joints_to_protect_from_walls, 0.05, GRB_GREATER_EQUAL, 1.0);
-    Eigen::Vector3d c1(0,0,1.0), c2(0,1,1.0), c3(1,0,1.0);
-    virtual_wall_task_2 = std::make_shared<VirtualWall>(kinematics.get(), c1, c2, c3, joints_to_protect_from_walls, 0.05, GRB_GREATER_EQUAL, 1.0);
-    Eigen::Vector3d fr1(0.7,0,0), fr2(0.7,0,1), fr3(0.7,1,0); 
-    virtual_wall_task_3 = std::make_shared<VirtualWall>(kinematics.get(), fr1, fr2, fr3, joints_to_protect_from_walls, 0.05, GRB_GREATER_EQUAL, 1.0);
-    Eigen::Vector3d bk1(-0.5,0,0), bk2(-0.5,1,0), bk3(-0.5,0,1);
-    virtual_wall_task_4 = std::make_shared<VirtualWall>(kinematics.get(), bk1, bk2, bk3, joints_to_protect_from_walls, 0.05, GRB_GREATER_EQUAL, 1.0);
-    Eigen::Vector3d l1(0,0.3,0), l2(1,0.3,0), l3(0,0.3,1);
-    virtual_wall_task_5 = std::make_shared<VirtualWall>(kinematics.get(), l1, l2, l3, joints_to_protect_from_walls, 0.05, GRB_GREATER_EQUAL, 1.0);
-    Eigen::Vector3d r1(0,-0.3,0), r2(0,-0.3,1), r3(1,-0.3,0);
-    virtual_wall_task_6 = std::make_shared<VirtualWall>(kinematics.get(), r1, r2, r3, joints_to_protect_from_walls, 0.05, GRB_GREATER_EQUAL, 1.0);
+    // Virtual walls
+    // Common settings
+    Eigen::VectorXi joints_to_protect_from_walls(2);
+    joints_to_protect_from_walls << 3, 7; 
+    double margin = 0.05; // d_min
+    double wall_gain = 1.0;
+    int wall_priority = 3;
 
+    // FLOOR (Z = 0.05)
+    Eigen::Vector3d f1(0,0,0.05), f2(1,0,0.05), f3(0,1,0.05);
+    virtual_wall_task_1 = std::make_shared<VirtualWall>(kinematics.get(), f1, f2, f3, joints_to_protect_from_walls, margin, GRB_GREATER_EQUAL, wall_gain);
+    // CEILING (Z = 1.0)
+    Eigen::Vector3d c1(0,0,1.0), c2(0,1,1.0), c3(1,0,1.0);
+    virtual_wall_task_2 = std::make_shared<VirtualWall>(kinematics.get(), c1, c2, c3, joints_to_protect_from_walls, margin, GRB_GREATER_EQUAL, wall_gain);
+    // FRONT (X = 0.7)
+    Eigen::Vector3d fr1(0.7,0,0), fr2(0.7,0,1), fr3(0.7,1,0); 
+    virtual_wall_task_3 = std::make_shared<VirtualWall>(kinematics.get(), fr1, fr2, fr3, joints_to_protect_from_walls, margin, GRB_GREATER_EQUAL, wall_gain);
+    // BACK (X = -0.5)
+    Eigen::Vector3d bk1(-0.5,0,0), bk2(-0.5,1,0), bk3(-0.5,0,1);
+    virtual_wall_task_4 = std::make_shared<VirtualWall>(kinematics.get(), bk1, bk2, bk3, joints_to_protect_from_walls, margin, GRB_GREATER_EQUAL, wall_gain);
+    // LEFT (Y = 0.3)
+    Eigen::Vector3d l1(0,0.3,0), l2(1,0.3,0), l3(0,0.3,1);
+    virtual_wall_task_5 = std::make_shared<VirtualWall>(kinematics.get(), l1, l2, l3, joints_to_protect_from_walls, margin, GRB_GREATER_EQUAL, wall_gain);
+    // RIGHT (Y = -0.3)
+    Eigen::Vector3d r1(0,-0.3,0), r2(0,-0.3,1), r3(1,-0.3,0);
+    virtual_wall_task_6 = std::make_shared<VirtualWall>(kinematics.get(), r1, r2, r3, joints_to_protect_from_walls, margin, GRB_GREATER_EQUAL, wall_gain);
+
+    // Activate and add to stack
     std::vector<std::shared_ptr<VirtualWall>> all_virtual_walls = {
         virtual_wall_task_1, virtual_wall_task_2, virtual_wall_task_3, 
         virtual_wall_task_4, virtual_wall_task_5, virtual_wall_task_6
     };
     for (auto& wall : all_virtual_walls) {
-        wall->setPriorityLevel(3); wall->setSlacksState(false);
+        wall->setPriorityLevel(wall_priority);
+        wall->setSlacksState(false);
         task_stack.push_back(wall);
     }
 
+    // Pose task
     pose_task = std::make_shared<Pose>(kinematics.get(), GRB_EQUAL, Eigen::VectorXd::Ones(6), 5.0);
-    pose_task->setPriorityLevel(4); pose_task->setSlacksState(true);
+    pose_task->setPriorityLevel(4);
+    pose_task->setSlacksState(true);
     task_stack.push_back(pose_task);
 
     // Communication Setup
@@ -122,7 +150,6 @@ HqpReferenceGeneratorNode::HqpReferenceGeneratorNode() : Node("hqp_reference_gen
 void HqpReferenceGeneratorNode::joint_state_callback(const sensor_msgs::msg::JointState::SharedPtr msg) {
     if (is_initialized) return;
 
-    // We must map the incoming joint states carefully because robot_state_publisher does not always guarantee alphabetical order
     std::vector<double> initial_positions(7, 0.0);
     int matched_joints = 0;
 
@@ -147,7 +174,7 @@ void HqpReferenceGeneratorNode::joint_state_callback(const sensor_msgs::msg::Joi
         last_time = this->get_clock()->now();
         is_initialized = true;
         
-        // We can safely release the subscriber now to save overhead
+        // Release the subscriber to save overhead
         joint_state_sub.reset();
         RCLCPP_INFO(this->get_logger(), "Virtual Model Aligned. HQP Loop Active at 500 Hz.");
     }

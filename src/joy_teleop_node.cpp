@@ -26,7 +26,7 @@ JoyTeleopNode::JoyTeleopNode(const rclcpp::NodeOptions & options)
 
     joy_sub = this->create_subscription<sensor_msgs::msg::Joy>("/joy", 10, [this](const sensor_msgs::msg::Joy::SharedPtr msg) { this->joy_callback(msg); });
 
-    pose_pub = this->create_publisher<geometry_msgs::msg::PoseStamped>("/my_hqp_cartesian_controller/target_pose", 10);
+    pose_pub = this->create_publisher<geometry_msgs::msg::PoseStamped>("/hqp_reference_generator_node/target_pose", 10);
 
     auto period = std::chrono::duration<double>(dt);
     timer = this->create_wall_timer(period, std::bind(&JoyTeleopNode::timer_callback, this));

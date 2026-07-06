@@ -9,7 +9,11 @@
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
-#include "std_msgs/msg/bool.hpp"
+
+// ROS 2 Actions for Franka Gripper
+#include "rclcpp_action/rclcpp_action.hpp"
+#include "franka_msgs/action/grasp.hpp"
+#include "franka_msgs/action/move.hpp"
 
 #include "tf2/LinearMath/Quaternion.h"
 #include "tf2/LinearMath/Matrix3x3.h"
@@ -29,12 +33,15 @@ private:
 
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub;
     rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pose_pub;
-    rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr gripper_pub;
     rclcpp::TimerBase::SharedPtr timer;
 
     rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr current_pose_sub;
     geometry_msgs::msg::PoseStamped latest_solver_pose;
     bool has_latest_pose{false};
+
+    // Gripper Action Clients
+    rclcpp_action::Client<franka_msgs::action::Grasp>::SharedPtr grasp_client;
+    rclcpp_action::Client<franka_msgs::action::Move>::SharedPtr move_client;
 
     std::string base_frame;
     std::string ee_frame;

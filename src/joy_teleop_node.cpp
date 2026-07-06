@@ -27,8 +27,9 @@ JoyTeleopNode::JoyTeleopNode(const rclcpp::NodeOptions & options)
 
     pose_pub = this->create_publisher<geometry_msgs::msg::PoseStamped>("/hqp_reference_generator_node/target_pose", 10);
     
-    // Initialize Gripper Publisher
-    gripper_pub = this->create_publisher<std_msgs::msg::Bool>("~/gripper_cmd", 10);
+    // Initialize Gripper Action Clients
+    grasp_client = rclcpp_action::create_client<franka_msgs::action::Grasp>(this, "/franka_gripper/grasp");
+    move_client = rclcpp_action::create_client<franka_msgs::action::Move>(this, "/franka_gripper/move");
 
     auto period = std::chrono::duration<double>(dt);
     timer = this->create_wall_timer(period, std::bind(&JoyTeleopNode::timer_callback, this));
@@ -81,13 +82,35 @@ void JoyTeleopNode::joy_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
         if (button_a_pressed && !button_a_prev) {
             gripper_closed = !gripper_closed; // Toggle state
             
-            std_msgs::msg::Bool gripper_msg;
-            gripper_msg.data = gripper_closed;
-            gripper_pub->publish(gripper_msg);
-            
-            RCLCPP_INFO(this->get_logger(), "Gripper Toggled: %s", gripper_closed ? "CLOSED" : "OPEN");
+            if (gripper_closed) {
+                // Command GRASP
+                if (!grasp_client->action_server_is_ready()) {
+                    RCLCPP_WARN(this->get_logger(), "Franka Grasp action server not ready!");
+                } else {
+                    auto goal = franka_msgs::action::Grasp::Goal();
+                    goal.width = 0.0;        // Try to close fully
+                    goal.speed = 0.1;        // 10 cm/s
+                    goal.force = 40.0;       // 40 Newtons grip force
+                    goal.epsilon.inner = 0.08; // Allow it to stop early on an object
+                    goal.epsilon.outer = 0.08;
+                    grasp_client->async_send_goal(goal);
+                    RCLCPP_INFO(this->get_logger(), "Gripper: GRASPING");
+                }
+            } else {
+                // Command MOVE (Open)
+                if (!move_client->action_server_is_ready()) {
+                    RCLCPP_WARN(this->get_logger(), "Franka Move action server not ready!");
+                } else {
+                    auto goal = franka_msgs::action::Move::Goal();
+                    goal.width = 0.08;       // Open to 8cm (max width)
+                    goal.speed = 0.1;        // 10 cm/s
+                    move_client->async_send_goal(goal);
+                    RCLCPP_INFO(this->get_logger(), "Gripper: OPENING");
+                }
+            }
         }
-        button_a_prev = button_a_pressed; // Store state for the next callback
+        
+        button_a_prev = button_a_pressed; 
     }
 }
 

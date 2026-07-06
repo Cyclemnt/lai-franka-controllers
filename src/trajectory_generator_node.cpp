@@ -8,8 +8,13 @@ TrajectoryGenerator::TrajectoryGenerator() : Node("trajectory_generator") {
     cmd_pub = this->create_publisher<geometry_msgs::msg::PoseStamped>("/hqp_reference_generator_node/target_pose", 10);
     goal_sub = this->create_subscription<geometry_msgs::msg::PoseStamped>("/goal_pose", 10, std::bind(&TrajectoryGenerator::goal_callback, this, std::placeholders::_1));
 
-    tf_buffer = std::make_unique<tf2_ros::Buffer>(this->get_clock());
-    tf_listener = std::make_shared<tf2_ros::TransformListener>(*tf_buffer);
+    // tf_buffer = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+    // tf_listener = std::make_shared<tf2_ros::TransformListener>(*tf_buffer);
+    current_pose_sub = this->create_subscription<geometry_msgs::msg::PoseStamped>("/hqp_reference_generator_node/current_pose", 10,
+        [this](const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
+            latest_solver_pose = *msg;
+            has_latest_pose = true;
+        });
 
     // 100 Hz
     timer = this->create_wall_timer(1ms, std::bind(&TrajectoryGenerator::timer_callback, this)); // is 100Hz enough?
@@ -17,34 +22,68 @@ TrajectoryGenerator::TrajectoryGenerator() : Node("trajectory_generator") {
     RCLCPP_INFO(this->get_logger(), "Trajectory Generator Ready.");
 }
 
-void TrajectoryGenerator::prepare_segment(const Eigen::Vector3d& target_p, const Eigen::Quaterniond& target_q, double manual_duration) {
-    try {
-        auto transform = tf_buffer->lookupTransform("fr3_link0", "fr3_link8", tf2::TimePointZero);
-        p_start << transform.transform.translation.x, transform.transform.translation.y, transform.transform.translation.z;
-        q_start = Eigen::Quaterniond(transform.transform.rotation.w, transform.transform.rotation.x, transform.transform.rotation.y, transform.transform.rotation.z);
+// void TrajectoryGenerator::prepare_segment(const Eigen::Vector3d& target_p, const Eigen::Quaterniond& target_q, double manual_duration) {
+//     try {
+//         auto transform = tf_buffer->lookupTransform("fr3_link0", "fr3_link8", tf2::TimePointZero);
+//         p_start << transform.transform.translation.x, transform.transform.translation.y, transform.transform.translation.z;
+//         q_start = Eigen::Quaterniond(transform.transform.rotation.w, transform.transform.rotation.x, transform.transform.rotation.y, transform.transform.rotation.z);
         
-        p_goal = target_p;
-        q_goal = target_q;
-        q_start.normalize();
-        q_goal.normalize();
+//         p_goal = target_p;
+//         q_goal = target_q;
+//         q_start.normalize();
+//         q_goal.normalize();
 
-        if (q_start.dot(q_goal) < 0.0) q_goal.coeffs() *= -1.0;
+//         if (q_start.dot(q_goal) < 0.0) q_goal.coeffs() *= -1.0;
 
-        if (manual_duration > 0) {
-            duration = manual_duration;
-        } else {
-            double linear_distance = (p_goal - p_start).norm();
-            double angular_distance = q_start.angularDistance(q_goal);
-            double t_vel = 1.875 * std::max(linear_distance / max_linear_vel, angular_distance / max_angular_vel);
-            double t_accel = std::sqrt(5.77 * std::max(linear_distance / max_linear_acc, angular_distance / max_angular_acc));
-            duration = std::max({t_vel, t_accel, min_duration});
-        }
+//         if (manual_duration > 0) {
+//             duration = manual_duration;
+//         } else {
+//             double linear_distance = (p_goal - p_start).norm();
+//             double angular_distance = q_start.angularDistance(q_goal);
+//             double t_vel = 1.875 * std::max(linear_distance / max_linear_vel, angular_distance / max_angular_vel);
+//             double t_accel = std::sqrt(5.77 * std::max(linear_distance / max_linear_acc, angular_distance / max_angular_acc));
+//             duration = std::max({t_vel, t_accel, min_duration});
+//         }
 
-        t_start = this->get_clock()->now();
-        trajectory_active = true;
-    } catch (const tf2::TransformException & ex) {
-        RCLCPP_WARN(this->get_logger(), "TF Error: %s", ex.what());
+//         t_start = this->get_clock()->now();
+//         trajectory_active = true;
+//     } catch (const tf2::TransformException & ex) {
+//         RCLCPP_WARN(this->get_logger(), "TF Error: %s", ex.what());
+//     }
+//     RCLCPP_INFO(this->get_logger(), "Starting new segment. Duration: %.2fs.", duration);
+// }
+
+void TrajectoryGenerator::prepare_segment(const Eigen::Vector3d& target_p, const Eigen::Quaterniond& target_q, double manual_duration) {
+    if (!has_latest_pose) {
+        RCLCPP_ERROR(this->get_logger(), "Cannot start trajectory: No pose received from HQP solver yet.");
+        return;
     }
+
+    // Use the exact solver state as the mathematical starting point
+    p_start << latest_solver_pose.pose.position.x, latest_solver_pose.pose.position.y, latest_solver_pose.pose.position.z;
+               
+    q_start = Eigen::Quaterniond(latest_solver_pose.pose.orientation.w, latest_solver_pose.pose.orientation.x, latest_solver_pose.pose.orientation.y, latest_solver_pose.pose.orientation.z);
+    
+    p_goal = target_p;
+    q_goal = target_q;
+    q_start.normalize();
+    q_goal.normalize();
+
+    if (q_start.dot(q_goal) < 0.0) q_goal.coeffs() *= -1.0;
+
+    if (manual_duration > 0) {
+        duration = manual_duration;
+    } else {
+        double linear_distance = (p_goal - p_start).norm();
+        double angular_distance = q_start.angularDistance(q_goal);
+        double t_vel = 1.875 * std::max(linear_distance / max_linear_vel, angular_distance / max_angular_vel);
+        double t_accel = std::sqrt(5.77 * std::max(linear_distance / max_linear_acc, angular_distance / max_angular_acc));
+        duration = std::max({t_vel, t_accel, min_duration});
+    }
+
+    t_start = this->get_clock()->now();
+    trajectory_active = true;
+    
     RCLCPP_INFO(this->get_logger(), "Starting new segment. Duration: %.2fs.", duration);
 }
 
@@ -68,9 +107,9 @@ void TrajectoryGenerator::start_stress_test() {
     waypoints.clear();
     Eigen::Quaterniond static_q(0.0, 1.0, 0.0, 0.0);
 
-    waypoints.push_back({Eigen::Vector3d(-0.8,  0.0,  0.4), static_q});
-    waypoints.push_back({Eigen::Vector3d( 0.0, -0.9,  0.4), static_q});
-    waypoints.push_back({Eigen::Vector3d( 1.1,  0.0,  0.4), static_q});
+    // waypoints.push_back({Eigen::Vector3d(-0.8,  0.0,  0.4), static_q});
+    // waypoints.push_back({Eigen::Vector3d( 0.0, -0.9,  0.4), static_q});
+    // waypoints.push_back({Eigen::Vector3d( 1.1,  0.0,  0.4), static_q});
 
     // waypoints.push_back({Eigen::Vector3d(-0.8,  0.0, 0.4), static_q});
     // waypoints.push_back({Eigen::Vector3d(-0.8, -0.8, 0.4), static_q});

@@ -48,6 +48,8 @@ private:
     rclcpp::Publisher<my_franka_msgs::msg::HqpDistances>::SharedPtr virtualwall_dist_pub;
     rclcpp::Publisher<my_franka_msgs::msg::HqpDistances>::SharedPtr selfhits_dist_pub;
 
+    rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr current_pose_pub;
+
     // Variables & Thread Safety
     std::vector<std::string> joint_names;
     std::mutex data_mutex;

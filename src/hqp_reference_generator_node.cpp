@@ -54,6 +54,10 @@ HqpReferenceGeneratorNode::HqpReferenceGeneratorNode() : Node("hqp_reference_gen
     kinematics->getSelectDOF()->assign(7, true);
     kinematics->getSelectTask()->assign(6, true);
 
+    // Initialize Solver and Task Stack
+    solver = std::make_shared<HierarchicalQP>(7, GRB_CONTINUOUS);
+    task_stack.clear();
+
     // Create Tasks
     // Joints configuration task
     q_upper_task = std::make_shared<JointsConfigurationLimits>(kinematics.get(), q_max, GRB_LESS_EQUAL, 1.0);
@@ -135,6 +139,8 @@ HqpReferenceGeneratorNode::HqpReferenceGeneratorNode() : Node("hqp_reference_gen
     error_pub = this->create_publisher<geometry_msgs::msg::TwistStamped>("~/tracking_error", 10);
     virtualwall_dist_pub = this->create_publisher<my_franka_msgs::msg::HqpDistances>("~/virtual_wall_distances", 10);
     selfhits_dist_pub = this->create_publisher<my_franka_msgs::msg::HqpDistances>("~/self_hits_distances", 10);
+
+    current_pose_pub = this->create_publisher<geometry_msgs::msg::PoseStamped>("~/current_pose", 10);
 
     target_pose_sub = this->create_subscription<geometry_msgs::msg::PoseStamped>("~/target_pose", 10, std::bind(&HqpReferenceGeneratorNode::target_pose_callback, this, std::placeholders::_1));
 
@@ -229,7 +235,7 @@ void HqpReferenceGeneratorNode::timer_callback() {
 
     // Publish to PD Controller
     auto joint_msg = sensor_msgs::msg::JointState();
-    joint_msg.header.stamp = current_time; // Current time (unix) is different from original HQP (starting at 0), must change for plotjuggler
+    joint_msg.header.stamp = current_time;
     joint_msg.name = joint_names;
     joint_msg.position.resize(7);
     joint_msg.velocity.resize(7);
@@ -282,6 +288,24 @@ void HqpReferenceGeneratorNode::timer_callback() {
         }
         selfhits_dist_pub->publish(self_msg);
     }
+
+    // Solver's Internal Pose
+    auto current_pose_msg = geometry_msgs::msg::PoseStamped();
+    current_pose_msg.header.stamp = current_time;
+    current_pose_msg.header.frame_id = "fr3_link0";
+
+    Eigen::Vector3d current_p = kinematics->getPosition();
+    Eigen::Quaterniond current_q = kinematics->getQuaternion();
+
+    current_pose_msg.pose.position.x = current_p.x();
+    current_pose_msg.pose.position.y = current_p.y();
+    current_pose_msg.pose.position.z = current_p.z();
+    current_pose_msg.pose.orientation.w = current_q.w();
+    current_pose_msg.pose.orientation.x = current_q.x();
+    current_pose_msg.pose.orientation.y = current_q.y();
+    current_pose_msg.pose.orientation.z = current_q.z();
+
+    current_pose_pub->publish(current_pose_msg);
 }
 
 } // namespace lai_franka_controllers

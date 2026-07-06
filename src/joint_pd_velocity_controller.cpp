@@ -49,10 +49,10 @@ controller_interface::CallbackReturn JointPdVelocityController::on_configure(con
     // Resize Math Vectors
     q_current.resize(num_joints);
     dq_cmd.resize(num_joints);
-    prev_dq_cmd.resize(num_joints);
+    // prev_dq_cmd.resize(num_joints);
     q_current.setZero();
     dq_cmd.setZero();
-    prev_dq_cmd.setZero();
+    // prev_dq_cmd.setZero();
 
     // Setup dq_cmd publisher
     dq_cmd_pub = get_node()->create_publisher<sensor_msgs::msg::JointState>("~/output_dq_cmd", rclcpp::SystemDefaultsQoS());

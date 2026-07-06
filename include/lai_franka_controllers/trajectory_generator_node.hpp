@@ -33,8 +33,11 @@ private:
     rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr goal_sub;
     rclcpp::TimerBase::SharedPtr timer;
 
-    std::unique_ptr<tf2_ros::Buffer> tf_buffer;
-    std::shared_ptr<tf2_ros::TransformListener> tf_listener;
+    // std::unique_ptr<tf2_ros::Buffer> tf_buffer;
+    // std::shared_ptr<tf2_ros::TransformListener> tf_listener;
+    rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr current_pose_sub;
+    geometry_msgs::msg::PoseStamped latest_solver_pose;
+    bool has_latest_pose{false};
 
     // State
     Mode current_mode{Mode::IDLE};

@@ -104,17 +104,17 @@ HqpReferenceGeneratorNode::HqpReferenceGeneratorNode() : Node("hqp_reference_gen
     // CEILING (Z = 1.0)
     Eigen::Vector3d c1(0,0,1.0), c2(0,1,1.0), c3(1,0,1.0);
     virtual_wall_task_2 = std::make_shared<VirtualWall>(kinematics.get(), c1, c2, c3, joints_to_protect_from_walls, margin, GRB_GREATER_EQUAL, wall_gain);
-    // FRONT (X = 0.7)
-    Eigen::Vector3d fr1(0.7,0,0), fr2(0.7,0,1), fr3(0.7,1,0); 
+    // FRONT (X = 0.8)
+    Eigen::Vector3d fr1(0.8,0,0), fr2(0.8,0,1), fr3(0.8,1,0); 
     virtual_wall_task_3 = std::make_shared<VirtualWall>(kinematics.get(), fr1, fr2, fr3, joints_to_protect_from_walls, margin, GRB_GREATER_EQUAL, wall_gain);
     // BACK (X = -0.5)
     Eigen::Vector3d bk1(-0.5,0,0), bk2(-0.5,1,0), bk3(-0.5,0,1);
     virtual_wall_task_4 = std::make_shared<VirtualWall>(kinematics.get(), bk1, bk2, bk3, joints_to_protect_from_walls, margin, GRB_GREATER_EQUAL, wall_gain);
-    // LEFT (Y = 0.3)
-    Eigen::Vector3d l1(0,0.3,0), l2(1,0.3,0), l3(0,0.3,1);
+    // LEFT (Y = 0.5)
+    Eigen::Vector3d l1(0,0.5,0), l2(1,0.5,0), l3(0,0.5,1);
     virtual_wall_task_5 = std::make_shared<VirtualWall>(kinematics.get(), l1, l2, l3, joints_to_protect_from_walls, margin, GRB_GREATER_EQUAL, wall_gain);
-    // RIGHT (Y = -0.3)
-    Eigen::Vector3d r1(0,-0.3,0), r2(0,-0.3,1), r3(1,-0.3,0);
+    // RIGHT (Y = -0.5)
+    Eigen::Vector3d r1(0,-0.5,0), r2(0,-0.5,1), r3(1,-0.5,0);
     virtual_wall_task_6 = std::make_shared<VirtualWall>(kinematics.get(), r1, r2, r3, joints_to_protect_from_walls, margin, GRB_GREATER_EQUAL, wall_gain);
 
     // Activate and add to stack

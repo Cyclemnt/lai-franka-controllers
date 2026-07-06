@@ -8,8 +8,8 @@ JoyTeleopNode::JoyTeleopNode(const rclcpp::NodeOptions & options)
     this->declare_parameter<std::string>("base_frame", "fr3_link0");
     this->declare_parameter<std::string>("ee_frame", "fr3_link8");
     this->declare_parameter<double>("publish_rate", 1000.0);
-    this->declare_parameter<double>("v_max", 0.10);
-    this->declare_parameter<double>("omega_max", 0.10);
+    this->declare_parameter<double>("v_max", 0.20);
+    this->declare_parameter<double>("omega_max", 0.20);
 
     this->get_parameter("base_frame", base_frame);
     this->get_parameter("ee_frame", ee_frame);
@@ -77,15 +77,15 @@ void JoyTeleopNode::joy_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
         bool dpad_left = (msg->axes[6] > 0.5);
         bool dpad_right = (msg->axes[6] < -0.5);
 
-        // Decrease speed (Floor at 1%)
+        // Decrease speed (Floor at 5%)
         if (dpad_left && !dpad_left_prev) {
-            speed_percentage = std::max(2, speed_percentage - 2);
+            speed_percentage = std::max(5, speed_percentage - 5);
             RCLCPP_INFO(this->get_logger(), "Speed Limit: %d%%", speed_percentage);
         }
         
         // Increase speed (Ceil at 100%)
         if (dpad_right && !dpad_right_prev) {
-            speed_percentage = std::min(100, speed_percentage + 2);
+            speed_percentage = std::min(100, speed_percentage + 5);
             RCLCPP_INFO(this->get_logger(), "Speed Limit: %d%%", speed_percentage);
         }
 
@@ -195,13 +195,13 @@ void JoyTeleopNode::timer_callback() {
     }
 
     // Clamp translation
-    const double Max_Translation_Lead = 0.005; 
+    const double Max_Translation_Lead = 0.01; 
     target_x = std::clamp(target_x, current_x - Max_Translation_Lead, current_x + Max_Translation_Lead);
     target_y = std::clamp(target_y, current_y - Max_Translation_Lead, current_y + Max_Translation_Lead);
     target_z = std::clamp(target_z, current_z - Max_Translation_Lead, current_z + Max_Translation_Lead);
 
     // Clamp rotations
-    const double Max_Rotation_Lead = 0.05; // Radians
+    const double Max_Rotation_Lead = 0.1; // Radians
     tf2::Quaternion q_error = current_q.inverse() * target_q;
     q_error.normalize();
     double angle = q_error.getAngleShortestPath();

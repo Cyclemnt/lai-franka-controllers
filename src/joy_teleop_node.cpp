@@ -34,7 +34,7 @@ JoyTeleopNode::JoyTeleopNode(const rclcpp::NodeOptions & options)
     auto period = std::chrono::duration<double>(dt);
     timer = this->create_wall_timer(period, std::bind(&JoyTeleopNode::timer_callback, this));
 
-    RCLCPP_INFO(this->get_logger(), "Teleop Engine Running. Waiting for HQP pose...");
+    RCLCPP_INFO(this->get_logger(), "Teleop Engine Running. Speed set to %d%%.", speed_percentage);
 }
 
 bool JoyTeleopNode::get_current_pose(double &x, double &y, double &z, tf2::Quaternion &q) {
@@ -56,9 +56,10 @@ void JoyTeleopNode::joy_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
     cmd_x = 0.0; cmd_y = 0.0; cmd_z = 0.0;
     cmd_roll = 0.0; cmd_pitch = 0.0; cmd_yaw = 0.0;
 
-    if (msg->axes.size() >= 6) {
+    // Standard joysticks usually have at least 8 axes
+    if (msg->axes.size() >= 7) {
         cmd_x = msg->axes[1]; 
-        cmd_y = -msg->axes[0];
+        cmd_y = msg->axes[0];
         
         cmd_roll = msg->axes[3]; 
         cmd_pitch = msg->axes[4];
@@ -71,6 +72,25 @@ void JoyTeleopNode::joy_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
         } else if (rt_axis < 0.9) {
             cmd_z = -(1.0 - rt_axis) / 2.0;
         }
+
+        // D-PAD Speed Control
+        bool dpad_left = (msg->axes[6] > 0.5);
+        bool dpad_right = (msg->axes[6] < -0.5);
+
+        // Decrease speed (Floor at 1%)
+        if (dpad_left && !dpad_left_prev) {
+            speed_percentage = std::max(2, speed_percentage - 2);
+            RCLCPP_INFO(this->get_logger(), "Speed Limit: %d%%", speed_percentage);
+        }
+        
+        // Increase speed (Ceil at 100%)
+        if (dpad_right && !dpad_right_prev) {
+            speed_percentage = std::min(100, speed_percentage + 2);
+            RCLCPP_INFO(this->get_logger(), "Speed Limit: %d%%", speed_percentage);
+        }
+
+        dpad_left_prev = dpad_left;
+        dpad_right_prev = dpad_right;
     }
 
     if (msg->buttons.size() >= 6) {
@@ -130,8 +150,12 @@ void JoyTeleopNode::timer_callback() {
         RCLCPP_INFO(this->get_logger(), "HQP Pose Locked. Teleop active.");
     }
 
-    double v_max = this->get_parameter("v_max").as_double();         
-    double omega_max = this->get_parameter("omega_max").as_double(); 
+    // Apply Speed Percentage to Limits
+    double base_v_max = this->get_parameter("v_max").as_double();         
+    double base_omega_max = this->get_parameter("omega_max").as_double(); 
+
+    double v_max = base_v_max * (speed_percentage / 100.0);
+    double omega_max = base_omega_max * (speed_percentage / 100.0);
     
     const double ACCEL_LIMIT_TRANS = 0.1;  
     const double ACCEL_LIMIT_ROT   = 0.5;  

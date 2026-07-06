@@ -62,6 +62,11 @@ private:
     // Gripper State
     bool gripper_closed{false};
     bool button_a_prev{false};
+
+    // Speed Scaling
+    int speed_percentage{50};    // Starts at 50%
+    bool dpad_left_prev{false};
+    bool dpad_right_prev{false};
 };
 
 }  // namespace lai_franka_controllers

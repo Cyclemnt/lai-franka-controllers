@@ -22,44 +22,12 @@ TrajectoryGenerator::TrajectoryGenerator() : Node("trajectory_generator") {
     RCLCPP_INFO(this->get_logger(), "Trajectory Generator Ready.");
 }
 
-// void TrajectoryGenerator::prepare_segment(const Eigen::Vector3d& target_p, const Eigen::Quaterniond& target_q, double manual_duration) {
-//     try {
-//         auto transform = tf_buffer->lookupTransform("fr3_link0", "fr3_link8", tf2::TimePointZero);
-//         p_start << transform.transform.translation.x, transform.transform.translation.y, transform.transform.translation.z;
-//         q_start = Eigen::Quaterniond(transform.transform.rotation.w, transform.transform.rotation.x, transform.transform.rotation.y, transform.transform.rotation.z);
-        
-//         p_goal = target_p;
-//         q_goal = target_q;
-//         q_start.normalize();
-//         q_goal.normalize();
-
-//         if (q_start.dot(q_goal) < 0.0) q_goal.coeffs() *= -1.0;
-
-//         if (manual_duration > 0) {
-//             duration = manual_duration;
-//         } else {
-//             double linear_distance = (p_goal - p_start).norm();
-//             double angular_distance = q_start.angularDistance(q_goal);
-//             double t_vel = 1.875 * std::max(linear_distance / max_linear_vel, angular_distance / max_angular_vel);
-//             double t_accel = std::sqrt(5.77 * std::max(linear_distance / max_linear_acc, angular_distance / max_angular_acc));
-//             duration = std::max({t_vel, t_accel, min_duration});
-//         }
-
-//         t_start = this->get_clock()->now();
-//         trajectory_active = true;
-//     } catch (const tf2::TransformException & ex) {
-//         RCLCPP_WARN(this->get_logger(), "TF Error: %s", ex.what());
-//     }
-//     RCLCPP_INFO(this->get_logger(), "Starting new segment. Duration: %.2fs.", duration);
-// }
-
 void TrajectoryGenerator::prepare_segment(const Eigen::Vector3d& target_p, const Eigen::Quaterniond& target_q, double manual_duration) {
     if (!has_latest_pose) {
         RCLCPP_ERROR(this->get_logger(), "Cannot start trajectory: No pose received from HQP solver yet.");
         return;
     }
 
-    // Use the exact solver state as the mathematical starting point
     p_start << latest_solver_pose.pose.position.x, latest_solver_pose.pose.position.y, latest_solver_pose.pose.position.z;
                
     q_start = Eigen::Quaterniond(latest_solver_pose.pose.orientation.w, latest_solver_pose.pose.orientation.x, latest_solver_pose.pose.orientation.y, latest_solver_pose.pose.orientation.z);

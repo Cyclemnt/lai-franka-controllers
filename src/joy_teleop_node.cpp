@@ -1,6 +1,5 @@
 #include "lai_franka_controllers/joy_teleop_node.hpp"
-#include "geometry_msgs/msg/transform_stamped.hpp"
-#include "tf2/exceptions.h"
+// Removed tf2 exceptions and transform stamped headers since they are no longer needed
 
 namespace lai_franka_controllers {
 
@@ -19,8 +18,11 @@ JoyTeleopNode::JoyTeleopNode(const rclcpp::NodeOptions & options)
 
     dt = 1.0 / publish_rate;
 
-    tf_buffer = std::make_shared<tf2_ros::Buffer>(this->get_clock());
-    tf_listener = std::make_shared<tf2_ros::TransformListener>(*tf_buffer);
+    current_pose_sub = this->create_subscription<geometry_msgs::msg::PoseStamped>("/hqp_reference_generator_node/current_pose", 10,
+        [this](const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
+            latest_solver_pose = *msg;
+            has_latest_pose = true;
+        });
 
     joy_sub = this->create_subscription<sensor_msgs::msg::Joy>("/joy", 10, [this](const sensor_msgs::msg::Joy::SharedPtr msg) { this->joy_callback(msg); });
 
@@ -29,23 +31,22 @@ JoyTeleopNode::JoyTeleopNode(const rclcpp::NodeOptions & options)
     auto period = std::chrono::duration<double>(dt);
     timer = this->create_wall_timer(period, std::bind(&JoyTeleopNode::timer_callback, this));
 
-    RCLCPP_INFO(this->get_logger(), "Teleop Engine Running.");
+    RCLCPP_INFO(this->get_logger(), "Teleop Engine Running. Waiting for HQP pose...");
 }
 
 bool JoyTeleopNode::get_current_pose(double &x, double &y, double &z, tf2::Quaternion &q) {
-    try {
-        geometry_msgs::msg::TransformStamped tf = tf_buffer->lookupTransform(base_frame, ee_frame, tf2::TimePointZero);
-        x = tf.transform.translation.x;
-        y = tf.transform.translation.y;
-        z = tf.transform.translation.z;
+    if (!has_latest_pose) {
+        // Return false until the HQP solver starts broadcasting
+        return false; 
+    }
 
-        q.setValue(tf.transform.rotation.x, tf.transform.rotation.y, tf.transform.rotation.z, tf.transform.rotation.w);
-        return true;
-    }
-    catch (const tf2::TransformException & ex) {
-        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000, "TF lookup failed: %s", ex.what());
-        return false;
-    }
+    x = latest_solver_pose.pose.position.x;
+    y = latest_solver_pose.pose.position.y;
+    z = latest_solver_pose.pose.position.z;
+
+    q.setValue(latest_solver_pose.pose.orientation.x, latest_solver_pose.pose.orientation.y, latest_solver_pose.pose.orientation.z, latest_solver_pose.pose.orientation.w);
+               
+    return true;
 }
 
 void JoyTeleopNode::joy_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
@@ -67,7 +68,6 @@ void JoyTeleopNode::joy_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
         } else if (rt_axis < 0.9) {
             cmd_z = -(1.0 - rt_axis) / 2.0;
         }
-        
     }
 
     if (msg->buttons.size() >= 6) {
@@ -80,6 +80,7 @@ void JoyTeleopNode::timer_callback() {
     double current_x, current_y, current_z;
     tf2::Quaternion current_q;
     
+    // Block integration until HQP broadcasts its state
     if (!get_current_pose(current_x, current_y, current_z, current_q)) {
         return; 
     }
@@ -88,6 +89,7 @@ void JoyTeleopNode::timer_callback() {
         target_x = current_x; target_y = current_y; target_z = current_z;
         target_q = current_q;
         is_initialized = true;
+        RCLCPP_INFO(this->get_logger(), "HQP Pose Locked. Teleop active.");
     }
 
     double v_max = this->get_parameter("v_max").as_double();         

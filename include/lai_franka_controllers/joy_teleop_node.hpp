@@ -10,8 +10,7 @@
 #include "sensor_msgs/msg/joy.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
 
-#include "tf2_ros/transform_listener.h"
-#include "tf2_ros/buffer.h"
+// We keep tf2 math for your quaternions, but remove the ROS TF listeners
 #include "tf2/LinearMath/Quaternion.h"
 #include "tf2/LinearMath/Matrix3x3.h"
 #include "tf2/LinearMath/Vector3.h"
@@ -32,8 +31,9 @@ private:
     rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pose_pub;
     rclcpp::TimerBase::SharedPtr timer;
 
-    std::shared_ptr<tf2_ros::Buffer> tf_buffer;
-    std::shared_ptr<tf2_ros::TransformListener> tf_listener;
+    rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr current_pose_sub;
+    geometry_msgs::msg::PoseStamped latest_solver_pose;
+    bool has_latest_pose{false};
 
     std::string base_frame;
     std::string ee_frame;

@@ -20,6 +20,9 @@ find_package(pinocchio REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_eigen REQUIRED)
 
+find_package(rclcpp_action REQUIRED)
+find_package(franka_msgs REQUIRED)
+
 find_package(task REQUIRED)
 find_package(qp REQUIRED)
 find_package(hierarchical_qp REQUIRED)
@@ -125,6 +128,8 @@ ament_target_dependencies(joy_teleop_node
   tf2_ros
   tf2_eigen
   Eigen3
+  rclcpp_action
+  franka_msgs
 )
 
 ament_target_dependencies(raw_usb_joy_node rclcpp sensor_msgs)

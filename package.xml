@@ -27,6 +27,12 @@
   <depend>eigen3</depend>
   <depend>pinocchio</depend>
 
+  <depend>eigen3</depend>
+  <depend>pinocchio</depend>
+
+  <depend>rclcpp_action</depend>
+  <depend>franka_msgs</depend>
+
   <export>
     <build_type>ament_cmake</build_type>
     <controller_interface plugin="${prefix}/plugin.xml" />

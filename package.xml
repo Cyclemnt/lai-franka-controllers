@@ -27,9 +27,6 @@
   <depend>eigen3</depend>
   <depend>pinocchio</depend>
 
-  <depend>eigen3</depend>
-  <depend>pinocchio</depend>
-
   <depend>rclcpp_action</depend>
   <depend>franka_msgs</depend>
 

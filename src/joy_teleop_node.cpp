@@ -1,5 +1,4 @@
 #include "lai_franka_controllers/joy_teleop_node.hpp"
-// Removed tf2 exceptions and transform stamped headers since they are no longer needed
 
 namespace lai_franka_controllers {
 
@@ -27,6 +26,9 @@ JoyTeleopNode::JoyTeleopNode(const rclcpp::NodeOptions & options)
     joy_sub = this->create_subscription<sensor_msgs::msg::Joy>("/joy", 10, [this](const sensor_msgs::msg::Joy::SharedPtr msg) { this->joy_callback(msg); });
 
     pose_pub = this->create_publisher<geometry_msgs::msg::PoseStamped>("/hqp_reference_generator_node/target_pose", 10);
+    
+    // Initialize Gripper Publisher
+    gripper_pub = this->create_publisher<std_msgs::msg::Bool>("~/gripper_cmd", 10);
 
     auto period = std::chrono::duration<double>(dt);
     timer = this->create_wall_timer(period, std::bind(&JoyTeleopNode::timer_callback, this));
@@ -73,6 +75,19 @@ void JoyTeleopNode::joy_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
     if (msg->buttons.size() >= 6) {
         if (msg->buttons[4] == 1) cmd_yaw = 1.0;
         else if (msg->buttons[5] == 1) cmd_yaw = -1.0;
+        
+        // Gripper Toggle Logic
+        bool button_a_pressed = (msg->buttons[0] == 1);
+        if (button_a_pressed && !button_a_prev) {
+            gripper_closed = !gripper_closed; // Toggle state
+            
+            std_msgs::msg::Bool gripper_msg;
+            gripper_msg.data = gripper_closed;
+            gripper_pub->publish(gripper_msg);
+            
+            RCLCPP_INFO(this->get_logger(), "Gripper Toggled: %s", gripper_closed ? "CLOSED" : "OPEN");
+        }
+        button_a_prev = button_a_pressed; // Store state for the next callback
     }
 }
 

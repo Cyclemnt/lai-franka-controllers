@@ -9,8 +9,8 @@
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
+#include "std_msgs/msg/bool.hpp"
 
-// We keep tf2 math for your quaternions, but remove the ROS TF listeners
 #include "tf2/LinearMath/Quaternion.h"
 #include "tf2/LinearMath/Matrix3x3.h"
 #include "tf2/LinearMath/Vector3.h"
@@ -29,6 +29,7 @@ private:
 
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub;
     rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pose_pub;
+    rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr gripper_pub;
     rclcpp::TimerBase::SharedPtr timer;
 
     rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr current_pose_sub;
@@ -50,6 +51,10 @@ private:
     tf2::Quaternion target_q{0.0, 0.0, 0.0, 1.0};
 
     bool is_initialized{false};
+    
+    // Gripper State
+    bool gripper_closed{false};
+    bool button_a_prev{false};
 };
 
 }  // namespace lai_franka_controllers

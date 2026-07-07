@@ -1,3 +1,6 @@
+/// @file joint_sine_publisher_node.cpp
+/// @brief Diagnostic trajectory calculation and system tracking loop details.
+
 #include "lai_franka_controllers/joint_sine_publisher_node.hpp"
 #include <cmath>
 
@@ -7,108 +10,104 @@ namespace lai_franka_controllers {
 
 JointSinePublisherNode::JointSinePublisherNode() : Node("joint_sine_publisher") {
     
-    // Declare and get the target topic name
+    // Declare dynamic parameters with baseline tracking fallbacks
     this->declare_parameter<std::string>("target_topic", "/joint_pd_velocity_controller/joint_commands");
+    this->declare_parameter<std::vector<double>>("amplitudes", {0.10, 0.10, 0.10, 0.10, 0.10, 0.10, 0.10});
+    this->declare_parameter<std::vector<double>>("frequencies", {0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05});
+
     std::string target_topic = this->get_parameter("target_topic").as_string();
+    amplitudes_ = this->get_parameter("amplitudes").as_double_array();
+    frequencies_ = this->get_parameter("frequencies").as_double_array();
 
-    publisher = this->create_publisher<sensor_msgs::msg::JointState>(target_topic, 10);
+    publisher_ = this->create_publisher<sensor_msgs::msg::JointState>(target_topic, 10);
     
-    // Subscribe to capture the initial position and track current position
-    joint_sub = this->create_subscription<sensor_msgs::msg::JointState>("/joint_states", 10, std::bind(&JointSinePublisherNode::joint_state_callback, this, std::placeholders::_1));
+    // Subscribe to track initial hardware home configurations and error properties
+    joint_sub_ = this->create_subscription<sensor_msgs::msg::JointState>(
+        "/joint_states", 10, std::bind(&JointSinePublisherNode::joint_state_callback, this, std::placeholders::_1));
 
-    joint_names = {"fr3_joint1", "fr3_joint2", "fr3_joint3", "fr3_joint4", "fr3_joint5", "fr3_joint6", "fr3_joint7"};
+    joint_names_ = {"fr3_joint1", "fr3_joint2", "fr3_joint3", "fr3_joint4", "fr3_joint5", "fr3_joint6", "fr3_joint7"};
 
-    initial_positions.resize(7, 0.0);
-    current_positions.resize(7, 0.0);
+    const size_t num_joints = joint_names_.size();
+    initial_positions_.resize(num_joints, 0.0);
+    current_positions_.resize(num_joints, 0.0);
 
-    amplitudes  = {0.10, 0.10, 0.10, 0.10, 0.10, 0.10, 0.10}; // Radians
-    frequencies = {0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05}; // Hz
+    if (amplitudes_.size() != num_joints || frequencies_.size() != num_joints) {
+        RCLCPP_ERROR(this->get_logger(), "Waveform profile array sizes must strictly match joint dimensions.");
+    }
 
-    // 100 Hz Loop
-    timer = this->create_wall_timer(10ms, std::bind(&JointSinePublisherNode::timer_callback, this));
+    // 100 Hz tracking calculations update loop
+    timer_ = this->create_wall_timer(10ms, std::bind(&JointSinePublisherNode::timer_callback, this));
 
-    RCLCPP_INFO(this->get_logger(), "Waiting for /joint_states to capture initial hardware position...");
+    RCLCPP_INFO(this->get_logger(), "Waiting for hardware state initialization via /joint_states...");
 }
 
 void JointSinePublisherNode::joint_state_callback(const sensor_msgs::msg::JointState::SharedPtr msg) {
-    int matched_joints = 0;
-    std::vector<double> temp_positions(7, 0.0);
+    size_t matched_joints = 0;
+    const size_t num_joints = joint_names_.size();
+    std::vector<double> temp_positions(num_joints, 0.0);
 
     for (size_t i = 0; i < msg->name.size(); ++i) {
-        for (size_t j = 0; j < joint_names.size(); ++j) {
-            if (msg->name[i] == joint_names[j]) {
+        for (size_t j = 0; j < num_joints; ++j) {
+            if (msg->name[i] == joint_names_[j]) {
                 temp_positions[j] = msg->position[i];
                 matched_joints++;
             }
         }
     }
 
-    if (matched_joints == 7) {
-        std::lock_guard<std::mutex> lock(data_mutex);
+    if (matched_joints == num_joints) {
+        std::lock_guard<std::mutex> lock(data_mutex_);
         
-        // Always update current position for the error calculation
-        current_positions = temp_positions;
+        current_positions_ = temp_positions;
         
-        if (!is_initialized) {
-            initial_positions = temp_positions;
-            start_time = this->get_clock()->now();
-            is_initialized = true;
+        if (!is_initialized_) {
+            initial_positions_ = temp_positions;
+            start_time_ = this->get_clock()->now();
+            is_initialized_ = true;
             
-            RCLCPP_INFO(this->get_logger(), "Initial positions captured. Waiting for PD controller subscription.");
+            RCLCPP_INFO(this->get_logger(), "Initial hardware positions mapped. Beginning profile tracking output execution.");
         }
     }
 }
 
 void JointSinePublisherNode::timer_callback() {
-    if (!is_initialized) return;
+    if (!is_initialized_) return;
 
     auto msg = sensor_msgs::msg::JointState();
     rclcpp::Time current_time = this->get_clock()->now();
+    const size_t num_joints = joint_names_.size();
 
     msg.header.stamp = current_time;
-    msg.name = joint_names;
-    
-    msg.position.resize(7);
-    msg.velocity.resize(7);
+    msg.name = joint_names_;
+    msg.position.resize(num_joints);
+    msg.velocity.resize(num_joints);
 
-    std::lock_guard<std::mutex> lock(data_mutex);
+    std::lock_guard<std::mutex> lock(data_mutex_);
     
-    // Wait for subscription
-    // if (publisher->get_subscription_count() == 0) {
-    //     for (size_t i = 0; i < 7; ++i) {
-    //         msg.position[i] = initial_positions[i];
-    //         msg.velocity[i] = 0.0;
-    //     }
+    // Analytical Sinusoidal trajectory generations calculation
+    double t = (current_time - start_time_).seconds();
+    for (size_t i = 0; i < num_joints; ++i) {
+        double omega = 2.0 * M_PI * frequencies_[i];
         
-    //     // Reset start time continuously during the delay so that t=0 when the sine finally starts
-    //     start_time = current_time;
-    //     RCLCPP_INFO(this->get_logger(), "Waiting.");
-    // } 
-    // else {
-        // Standard Sine trajectory computation
-        double t = (current_time - start_time).seconds();
-        for (size_t i = 0; i < 7; ++i) {
-            double omega = 2.0 * M_PI * frequencies[i];
-            
-            // q = q0 + A * (1 - cos(wt))
-            msg.position[i] = initial_positions[i] + amplitudes[i] * (1.0 - std::cos(omega * t));
-            
-            // dq = A * w * sin(wt)
-            msg.velocity[i] = amplitudes[i] * omega * std::sin(omega * t);
-        }
+        // Formulated offset protects system limits by starting calculation tracking with zero acceleration:
+        // q = q0 + A * (1 - cos(w * t))
+        msg.position[i] = initial_positions_[i] + amplitudes_[i] * (1.0 - std::cos(omega * t));
+        
+        // dq = A * w * sin(w * t)
+        msg.velocity[i] = amplitudes_[i] * omega * std::sin(omega * t);
+    }
 
-        // Compute and print tracking error
-        double max_tracking_error = 0.0;
-        for (size_t i = 0; i < 7; ++i) {
-            double err = std::abs(current_positions[i] - msg.position[i]);
-            if (err > max_tracking_error) {
-                max_tracking_error = err;
-            }
+    // Capture closed-loop tracking diagnostic updates
+    double max_tracking_error = 0.0;
+    for (size_t i = 0; i < num_joints; ++i) {
+        double err = std::abs(current_positions_[i] - msg.position[i]);
+        if (err > max_tracking_error) {
+            max_tracking_error = err;
         }
-        RCLCPP_INFO(this->get_logger(), "Max tracking error: %.5f rad", max_tracking_error);
-    // }
+    }
+    RCLCPP_INFO(this->get_logger(), "Max closed-loop controller tracking error: %.5f rad", max_tracking_error);
 
-    publisher->publish(msg);
+    publisher_->publish(msg);
 }
 
 } // namespace lai_franka_controllers

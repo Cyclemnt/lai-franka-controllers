@@ -1,26 +1,45 @@
-# hqp_reference_generator_node: # original
-#   ros__parameters:
-#     mod_DH:
-#       a: [0.0, 0.0, 0.0, 0.0825, -0.0825, 0.0, 0.088]
-#       alpha: [0.0, -1.5708, 1.5708, 1.5708, -1.5708, 1.5708, 1.5708]
-#       d: [0.333, 0.0, 0.316, 0.0, 0.384, 0.0, 0.0]
-#       theta: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-#     A7e: [1.0, 0.0,   0.0, 0.0,
-#           0.0, 1.0,   0.0, 0.0,
-#           0.0, 0.0,   1.0, 0.0,
-#           0.0, 0.0, 0.107, 1.0]
-hqp_reference_generator_node: # trying to solve z and orientation offsets
+hqp_reference_generator_node:
   ros__parameters:
+    # Kinematic Frames Track Mapping M-DH Configuration Matrix Lookups
     mod_DH:
       a: [0.0, 0.0, 0.0, 0.0825, -0.0825, 0.0, 0.088]
       alpha: [0.0, -1.5708, 1.5708, 1.5708, -1.5708, 1.5708, 1.5708]
       d: [0.333, 0.0, 0.316, 0.0, 0.384, 0.0, 0.0]
       theta: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-    A7e: [0.70710678, -0.70710678, 0.0,   0.0,
-          0.70710678, 0.70710678,  0.0,   0.0,
-          0.0,        0.0,         1.0,   0.0,
-          0.0,        0.0,         0.107, 1.0]
-#    A7e: [1.0, 0.0, 0.0, 0.0,
-#          0.0, 1.0, 0.0, 0.0,
-#          0.0, 0.0, 1.0, 0.0,
-#          0.0, 0.0, 0.0, 1.0]
+    
+    # Hand TCP Transform (45 Degree Z-Axis Clockwise Flange Frame Rotation Pairing Shift Offset)
+    A7e: [0.70710678, -0.70710678,  0.0,    0.0,
+          0.70710678,  0.70710678,  0.0,    0.0,
+          0.0,         0.0,         1.0,    0.0,
+          0.0,         0.0,         0.2104, 1.0] # 0.107 (Flange) + 0.1034 (Hand TCP Extension)
+
+    # Priority Level 1: Hard Joint State Saturation Threshold Constraints Limits
+    joint_limits:
+      q_max: [2.897, 1.832, 2.897, -0.122, 2.879, 4.625, 3.054]
+      q_min: [-2.897, -1.832, -2.897, -3.071, -2.879, 0.436, -3.054]
+      dq_max: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+
+    # Priority Level 2: Self-Collision Fields
+    self_collision:
+      safe_points: [6]            # End-Effector Tracking Node Points
+      avoid_points: [0, 3]        # Base and Elbow Structural Segment Nodes
+      min_distance: 0.3           # Minimum allowed safe spatial distance offset (meters)
+
+    # Priority Level 3: Enclosed 6-Sided Virtual Workspace Box Planes
+    virtual_walls:
+      joints_to_protect: [3, 7]   # Active link configurations monitored for proximity updates
+      margin: 0.05                # Safe distance buffer threshold (d_min meters)
+      gain: 1.0                   # Repulsion velocity field multiplier scaling profile
+      priority: 3                 # Solver stack hierarchy classification
+      # Cartesian Plane Boundaries Config Definitions
+      floor_z: 0.05
+      ceiling_z: 1.0
+      front_x: 0.8
+      back_x: -0.5
+      left_y: 0.5
+      right_y: -0.5
+
+    # Priority Level 4: Soft Task Tracking Gains Profiles Weight Settings
+    pose_tracking:
+      priority: 4
+      gain: 5.0

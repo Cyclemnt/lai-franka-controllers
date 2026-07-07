@@ -1,0 +1,24 @@
+/joy_teleop_node:
+  ros__parameters:
+    # Kinematic Frames
+    base_frame: "fr3_link0"
+    ee_frame: "fr3_link8"
+    publish_rate: 1000.0
+
+    # Maximum Velocity Specifications (At 100% Scaling)
+    v_max: 0.20          # Maximum translation speed (m/s)
+    omega_max: 0.20      # Maximum rotation speed (rad/s)
+
+    # Profile Ramping Constraints
+    accel_limit_trans: 0.1   # Translational smoothing ramp acceleration limit (m/s^2)
+    accel_limit_rot: 0.5     # Rotational smoothing ramp acceleration limit (rad/s^2)
+    joystick_deadzone: 0.05  # Input noise cancellation threshold filtering near rest positions
+
+    # Anti-Windup Leash Thresholds
+    max_translation_lead: 0.01  # Maximum distance the virtual target can lead the physical robot (meters)
+    max_rotation_lead: 0.1      # Maximum angle the virtual target can lead the physical robot (radians)
+
+    # Franka Hand Controller Target Constants
+    gripper_grasp_speed: 0.1    # Velocity profile for closure action requests (m/s)
+    gripper_grasp_force: 40.0   # Squeezing mechanical output torque profile limit (Newtons)
+    gripper_open_width: 0.08    # Total stroke displacement parameter for wide release actions (meters)

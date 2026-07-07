@@ -1,9 +1,9 @@
-<library path="lai_franka_controllers">
+<library path="lai_franka_controllers_lib">
   <class name="lai_franka_controllers/CartesianVelocityController" 
          type="lai_franka_controllers::CartesianVelocityController" 
          base_class_type="controller_interface::ControllerInterface">
     <description>
-      Cartesian Velocity Controller using Pinocchio and Eigen.
+      Analytical Jacobian Damped Pseudo-Inverse Task-Space Velocity Controller using Pinocchio.
     </description>
   </class>
 
@@ -11,7 +11,7 @@
          type="lai_franka_controllers::HqpCartesianVelocityController" 
          base_class_type="controller_interface::ControllerInterface">
     <description>
-      Hierarchical QP Cartesian Velocity Controller using Gurobi and FrankaKinematics.
+      Legacy Real-Time Multi-Priority Hierarchical QP Cartesian Controller using Gurobi.
     </description>
   </class>
 
@@ -19,7 +19,7 @@
          type="lai_franka_controllers::JointPdVelocityController" 
          base_class_type="controller_interface::ControllerInterface">
     <description>
-      Low-level Joint PD Feedforward Controller with ZOH capabilities.
+      Low-Level Real-Time Safe Joint Space PD Controller with Velocity Feedforward and Watchdog Protection.
     </description>
   </class>
 </library>

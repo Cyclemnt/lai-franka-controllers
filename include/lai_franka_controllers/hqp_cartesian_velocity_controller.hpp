@@ -1,3 +1,8 @@
+/// @file hqp_cartesian_velocity_controller.hpp
+/// @brief Legacy low-level real-time HQP task-space velocity controller for Franka FR3.
+/// @author Clement Lamouller
+/// @date 2026
+
 #ifndef LAI_FRANKA_CONTROLLERS__HQP_CARTESIAN_VELOCITY_CONTROLLER_HPP_
 #define LAI_FRANKA_CONTROLLERS__HQP_CARTESIAN_VELOCITY_CONTROLLER_HPP_
 
@@ -5,20 +10,19 @@
 #include <string>
 #include <vector>
 
-// ROS 2 Control
+// ROS 2 Control Core Lifecycle Architecture
 #include "controller_interface/controller_interface.hpp"
 #include "rclcpp_lifecycle/state.hpp"
 #include "realtime_tools/realtime_buffer.hpp"
 #include "realtime_tools/realtime_publisher.hpp"
 
-// ROS 2 Messages
+// ROS 2 Standard Communication Messages
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "geometry_msgs/msg/twist_stamped.hpp"
 #include "sensor_msgs/msg/joint_state.hpp"
-#include <std_msgs/msg/float64_multi_array.hpp>
-#include "my_franka_msgs/msg/hqp_distances.hpp"
+#include "lai_franka_controllers/msg/hqp_distances.hpp"
 
-// Eigen & HQP Architecture
+// Eigen and Structural Optimization Architecture
 #include <Eigen/Dense>
 #include <task/allTasks.hpp>
 #include <hierarchical_qp/hierarchicalQP.h>
@@ -26,12 +30,20 @@
 
 namespace lai_franka_controllers {
 
+/// @class HqpCartesianVelocityController
+/// @brief Direct task-space controller running an active prioritization optimizer directly in the RT loop.
+///
+/// Bypasses the independent virtual internal model node layout to evaluate multi-priority safety tasks 
+/// and calculate command output variables during a single 1kHz cycle execution pass.
 class HqpCartesianVelocityController : public controller_interface::ControllerInterface {
 public:
+    /// @brief Default constructor.
     HqpCartesianVelocityController() = default;
-    ~HqpCartesianVelocityController() = default;
+    
+    /// @brief Default Destructor.
+    virtual ~HqpCartesianVelocityController() = default;
 
-    // controller_interface::ControllerInterface Overrides
+    // ---- ros2_control Lifecycle Interface Overrides ----
     controller_interface::CallbackReturn on_init() override;
     controller_interface::InterfaceConfiguration command_interface_configuration() const override;
     controller_interface::InterfaceConfiguration state_interface_configuration() const override;
@@ -41,67 +53,63 @@ public:
     controller_interface::return_type update(const rclcpp::Time & time, const rclcpp::Duration & period) override;
 
 private:
-
-    // Custom structure to avoid shared_ptr<PoseStamped>
+    /// @struct TargetPose
+    /// @brief Thread-safe encapsulation mapping input tracking targets across real-time loop cycles.
     struct TargetPose {
         Eigen::Vector3d position;
         Eigen::Quaterniond orientation;
         bool valid{false};
     };
 
-    // ROS 2 Parameters & Communication
-    std::vector<std::string> joint_names;
-    rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr target_pose_sub;
-    realtime_tools::RealtimeBuffer<TargetPose> rt_target_pose_ptr;
+    // ---- Configuration Property Buffers ----
+    std::vector<std::string> joint_names_;
+    rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr target_pose_sub_;
+    realtime_tools::RealtimeBuffer<TargetPose> rt_target_pose_ptr_;
 
-    std::shared_ptr<rclcpp::Publisher<geometry_msgs::msg::TwistStamped>> error_pub;
-    std::shared_ptr<realtime_tools::RealtimePublisher<geometry_msgs::msg::TwistStamped>> rt_error_pub;
+    // ---- Lock-Free Diagnostics Transmission Interfaces ----
+    std::shared_ptr<rclcpp::Publisher<geometry_msgs::msg::TwistStamped>> error_pub_;
+    std::shared_ptr<realtime_tools::RealtimePublisher<geometry_msgs::msg::TwistStamped>> rt_error_pub_;
     
-    std::shared_ptr<rclcpp::Publisher<sensor_msgs::msg::JointState>> dq_cmd_pub;
-    std::shared_ptr<realtime_tools::RealtimePublisher<sensor_msgs::msg::JointState>> rt_dq_cmd_pub;
+    std::shared_ptr<rclcpp::Publisher<sensor_msgs::msg::JointState>> dq_cmd_pub_;
+    std::shared_ptr<realtime_tools::RealtimePublisher<sensor_msgs::msg::JointState>> rt_dq_cmd_pub_;
 
-    rclcpp::Publisher<my_franka_msgs::msg::HqpDistances>::SharedPtr virtualwall_dist_pub;
-    std::shared_ptr<realtime_tools::RealtimePublisher<my_franka_msgs::msg::HqpDistances>> rt_virtualwall_dist_pub;
+    rclcpp::Publisher<lai_franka_controllers::msg::HqpDistances>::SharedPtr virtualwall_dist_pub_;
+    std::shared_ptr<realtime_tools::RealtimePublisher<lai_franka_controllers::msg::HqpDistances>> rt_virtualwall_dist_pub_;
 
-    rclcpp::Publisher<my_franka_msgs::msg::HqpDistances>::SharedPtr selfhits_dist_pub;
-    std::shared_ptr<realtime_tools::RealtimePublisher<my_franka_msgs::msg::HqpDistances>> rt_selfhits_dist_pub;
+    rclcpp::Publisher<lai_franka_controllers::msg::HqpDistances>::SharedPtr selfhits_dist_pub_;
+    std::shared_ptr<realtime_tools::RealtimePublisher<lai_franka_controllers::msg::HqpDistances>> rt_selfhits_dist_pub_;
 
-    // std::shared_ptr<rclcpp::Publisher<sensor_msgs::msg::JointState>> joint_states_pub;
-    // std::shared_ptr<realtime_tools::RealtimePublisher<sensor_msgs::msg::JointState>> rt_joint_states_pub;
-
-    // HQP Components
-    std::shared_ptr<FrankaKinematics> kinematics;
-    std::shared_ptr<HierarchicalQP> solver;
+    // ---- Core HQP Optimization Variables ----
+    std::shared_ptr<FrankaKinematics> kinematics_;
+    std::shared_ptr<HierarchicalQP> solver_;
     
-    // The task stack holds pointers to the base Task class
-    std::vector<std::shared_ptr<Task>> task_stack;
-    std::shared_ptr<JointsConfigurationLimits> q_upper_task;
-    std::shared_ptr<JointsConfigurationLimits> q_lower_task;
-    std::shared_ptr<JointsVelocityLimits> dq_upper_task;
-    std::shared_ptr<JointsVelocityLimits> dq_lower_task;
-    std::shared_ptr<SelfHits> self_collision_task;
-    std::shared_ptr<VirtualWall> virtual_wall_task_1;
-    std::shared_ptr<VirtualWall> virtual_wall_task_2;
-    std::shared_ptr<VirtualWall> virtual_wall_task_3;
-    std::shared_ptr<VirtualWall> virtual_wall_task_4;
-    std::shared_ptr<VirtualWall> virtual_wall_task_5;
-    std::shared_ptr<VirtualWall> virtual_wall_task_6;
-    std::shared_ptr<Pose> pose_task;
-    std::shared_ptr<JointSineTask> sine_task;
+    std::vector<std::shared_ptr<Task>> task_stack_;
+    std::shared_ptr<JointsConfigurationLimits> q_upper_task_;
+    std::shared_ptr<JointsConfigurationLimits> q_lower_task_;
+    std::shared_ptr<JointsVelocityLimits> dq_upper_task_;
+    std::shared_ptr<JointsVelocityLimits> dq_lower_task_;
+    std::shared_ptr<SelfHits> self_collision_task_;
+    std::shared_ptr<VirtualWall> virtual_wall_task_1_;
+    std::shared_ptr<VirtualWall> virtual_wall_task_2_;
+    std::shared_ptr<VirtualWall> virtual_wall_task_3_;
+    std::shared_ptr<VirtualWall> virtual_wall_task_4_;
+    std::shared_ptr<VirtualWall> virtual_wall_task_5_;
+    std::shared_ptr<VirtualWall> virtual_wall_task_6_;
+    std::shared_ptr<Pose> pose_task_;
+    std::shared_ptr<JointSineTask> sine_task_;
 
-    // Math Variables
-    Eigen::Matrix<double, 7, 1> q_current;
-    Eigen::Matrix<double, 7, 1> q_max;
-    Eigen::Matrix<double, 7, 1> q_min;
-    Eigen::Matrix<double, 7, 1> dq_cmd;
-    Eigen::Matrix<double, 7, 1> dq_limit;
-    Eigen::Matrix<double, 7, 1> ddq_limit;
+    // ---- Real-time Math State Vectors (7-DOF Space Requirements) ----
+    Eigen::Matrix<double, 7, 1> q_current_;
+    Eigen::Matrix<double, 7, 1> q_max_;
+    Eigen::Matrix<double, 7, 1> q_min_;
+    Eigen::Matrix<double, 7, 1> dq_cmd_;
+    Eigen::Matrix<double, 7, 1> dq_limit_;
     
-    Eigen::Vector3d x_target;
-    Eigen::Quaterniond quat_target;
+    Eigen::Vector3d x_target_;
+    Eigen::Quaterniond quat_target_;
 
-    // Security
-    rclcpp::Time last_target_time{0};
+    // ---- Timing Watchdogs and Guard Gates ----
+    rclcpp::Time last_target_time_{0};
 };
 
 }  // namespace lai_franka_controllers

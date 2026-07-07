@@ -1,3 +1,10 @@
+'''
+@file joy_teleop.launch.py
+@brief Launch file executing joystick telemetry drivers and processing loops.
+@author Clement Lamouller
+@date 2026
+'''
+
 import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
@@ -6,11 +13,12 @@ from launch.actions import SetEnvironmentVariable
 
 def generate_launch_description():
     pkg_share_dir = get_package_share_directory('lai_franka_controllers')
-    teleop_params = os.path.join(pkg_share_dir, 'config', 'teleop_params.yaml')
+    joy_teleop_params = os.path.join(pkg_share_dir, 'config', 'joy_teleop_params.yaml')
 
+    # Force colored console logging output across all subprocess tasks
     force_color_env = SetEnvironmentVariable('RCUTILS_COLORIZED_OUTPUT', '1')
 
-    # Native ROS 2 Joy Node Driver
+    # Standard native Linux OS joystick kernel driver
     joy_driver_node = Node(
         package='joy',
         executable='joy_node',
@@ -22,7 +30,7 @@ def generate_launch_description():
         output='screen'
     )
 
-    # or custom compiled Libusb binary
+    # Optional Libusb direct interface implementation (uncomment to substitute platform drivers)
     # joy_driver_node = Node(
     #     package='lai_franka_controllers',
     #     executable='raw_usb_joy_node',
@@ -30,12 +38,12 @@ def generate_launch_description():
     #     output='screen'
     # )
 
-    # Custom Teleop Translator Node
+    # Custom Teleoperation Mapping Translator Node
     joy_teleop_node = Node(
         package='lai_franka_controllers',
         executable='joy_teleop_node',
         name='joy_teleop_node',
-        parameters=[teleop_params],
+        parameters=[joy_teleop_params],
         output='screen'
     )
 

@@ -24,6 +24,9 @@
 #include <hierarchical_qp/hierarchicalQP.h>
 #include <robot_kinematics/FrankaKinematics.hpp>
 
+using namespace task;
+using namespace robot_kinematics;
+
 namespace lai_franka_controllers {
 
 /// @class HqpReferenceGeneratorNode

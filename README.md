@@ -1,57 +1,65 @@
-# LAI Franka ROS 2 Controllers
+# LAI Franka HQP Control Stack
 
-This package implements an advanced suite of real-time controllers, Hierarchical Quadratic Programming (HQP) safety filters, and teleoperation nodes for the Franka Emika FR3 manipulator using the `ros2_control` framework.
+This repository contains an advanced suite of real-time Cartesian motion controllers, mathematical task formulations, and analytical kinematics engines for the Franka Emika FR3 manipulator.
 
-This repository recently transitioned to a **decoupled Internal Model Control (IMC) architecture**. Instead of calculating complex optimizations inside the hardware loop, mathematical bounds (virtual walls, self-collision, kinematics) are resolved at 500 Hz inside an isolated virtual reference generator. Safe trajectories are then streamed to a real-time Joint PD Feedforward controller running strictly at 1000 Hz.
-
-## Package Structure
-
-### 1. `ros2_control` Hardware Plugins (1000 Hz)
-
-* **`joint_pd_velocity_controller.hpp`**: *(Recommended)* Joint-space tracking controller with velocity feedforward and timeout watchdogs. Designed to pair with the HQP Reference Generator.
-* **`hqp_cartesian_velocity_controller.hpp`**: *(Legacy)* Cartesian controller calculating Gurobi HQP optimization directly inside the 1kHz loop.
-* **`cartesian_velocity_controller.hpp`**: *(Legacy)* Pinocchio-based Jacobian pseudo-inverse controller with Levenberg-Marquardt damping and nullspace limits repulsion.
-
-### 2. Standalone Processing Nodes
-
-* **`hqp_reference_generator_node.hpp`**: The mathematical core. Solves strict-priority HQP constraints (joint limits, self-collision, virtual 6D bounding boxes) using Gurobi over a virtual robot model.
-* **`trajectory_generator_node.hpp`**: Quintic S-curve Cartesian path planner with an automated HQP boundary "Stress Test".
-* **`joint_sine_publisher_node.hpp`**: Diagnostic tool that publishes smooth, zero-started sinusoidal waves to test low-level joint tracking performance.
-
-### 3. Teleoperation Suite
-
-* **`joy_teleop_node.hpp`**: Translates raw gamepad inputs into smooth Cartesian velocity integrations with anti-windup leashes and asynchronous Franka gripper action hooks.
-* **`raw_usb_joy_node.hpp`**: WSL2-compatible direct `libusb` interrupt reader that bypasses missing Linux joystick drivers in Windows VMs.
-
-### 4. Configuration & Launch
-
-* **`hqp_node_params.yaml` / `hqp_node.launch.py`**: Configures virtual walls, DH parameters, safety margins, and starts the HQP solver.
-* **`joy_teleop_params.yaml` / `joy_teleop.launch.py`**: Configures max velocities, acceleration ramps, gamepad deadzones, and gripper forces.
+Developed during an internship at the **LAI Robotics Lab**, this stack implements a strictly prioritized Hierarchical Quadratic Programming (HQP) architecture. It separates complex optimization bounds (virtual walls, self-collision, kinematics limits) from the real-time 1 kHz hardware loop, ensuring mathematically guaranteed safety boundaries during autonomous trajectory execution and teleoperation.
 
 ---
 
-## Dependencies & Installation
+## Repository Structure
 
-### Prerequisites
+This repository contains three core packages that work together to control the robot:
 
-* **ROS 2 Humble**
-* **libfranka** & **franka_ros2** (franka_bringup / franka_gazebo_bringup)
-* **Gurobi Optimizer** (Valid license required)
-* **Pinocchio** & **Eigen3**
-* **libusb-1.0-0-dev** (For WSL2 direct gamepad support)
+| Package | Description |
+| --- | --- |
+| **`lai_franka_controllers`** | `ros2_control` hardware plugins, standalone HQP reference generation nodes, and gamepad teleoperation nodes. |
+| **`task`** | Mathematical constraints formulation engine. Maps physical objectives (Pose tracking, Virtual Walls, Self-Collision) into standard $A$ and $b$ matrices for the solver. |
+| **`robot_kinematics`** | High-performance, codegen-backed analytical kinematics engine providing real-time Jacobians, forward kinematics, and shortest-path error tracking. |
 
-### Building the Workspace
+*(For detailed information on each module, please refer to the individual `README.md` files located inside each package folder).*
 
-Building in `Release` mode is strictly required to ensure the optimization solvers execute within the required real-time hardware bounds.
+---
+
+## Important: Proprietary Lab Dependencies
+
+**Please Note:** This repository serves as a showcase of the control architectures and task formulations developed during my internship. It **cannot be compiled out-of-the-box** by the general public.
+
+The code relies on three closed-source, proprietary optimization wrapper libraries developed internally by the LAI Robotics Lab. These packages are not included in this repository to protect the laboratory's intellectual property:
+
+* **`qp`**: Internal Quadratic Programming solver wrapper interface.
+* **`hierarchical_qp`**: Internal HQP cascade solver engine.
+* **`auxiliaries_function_and_structures`**: Lab-specific mathematical utilities and structures.
+
+To compile this workspace, you must have these packages sourced in your local ROS 2 underlay.
+
+---
+
+## Standard System Dependencies
+
+If the proprietary lab packages are present, the following standard dependencies must also be installed:
+
+* **ROS 2 Humble** (Ubuntu 22.04)
+* **libfranka** & **franka_ros2**
+* **Gurobi Optimizer** (Valid system license strictly required)
+* **Eigen3** & **OpenMP**
+* **Pinocchio** (For legacy controller support)
+* **libusb-1.0-0-dev** (For WSL2 direct gamepad teleoperation support)
+
+---
+
+## Build Instructions
+
+Assuming all open-source and LAI dependencies are installed and sourced, the stack must be compiled in `Release` mode to ensure the Gurobi optimization solver and matrix multiplications evaluate within the strict 1 ms hardware timing constraint.
 
 ```bash
 cd ~/franka_ros2_ws/
 
-# Clean old artifacts to avoid CMake cache collisions
-rm -rf build/lai_franka_controllers install/lai_franka_controllers
+# Clean legacy CMake cache (Optional but recommended)
+rm -rf build/robot_kinematics build/task build/lai_franka_controllers
+rm -rf install/robot_kinematics install/task install/lai_franka_controllers
 
-# Build in Release Mode
-colcon build --packages-select lai_franka_controllers --cmake-args -DCMAKE_BUILD_TYPE=Release
+# Build the custom stack
+colcon build --packages-select robot_kinematics task lai_franka_controllers --cmake-args -DCMAKE_BUILD_TYPE=Release
 
 # Source the workspace
 source install/setup.bash
@@ -60,35 +68,15 @@ source install/setup.bash
 
 ---
 
-## Usage Guide
+## Quick Start & Launch Architecture
 
-### Step 1: Registering Controllers in `franka_bringup`
+The architecture utilizes a decoupled **Internal Model Control (IMC)** approach. The mathematical bounds are resolved inside an isolated virtual reference generator, which then streams safe trajectories to a lean Joint PD Feedforward controller.
 
-Before launching the robot or simulation, ROS 2 needs to know these controllers exist. You must add them to the `controllers.yaml` file located in `franka_bringup/config/` (for real hardware) or `franka_gazebo_bringup/config/` (for simulation).
+### 1. Hardware / Simulation Bringup
 
-Add the following to your `controllers.yaml`:
-
-```yaml
-joint_pd_velocity_controller:
-  ros__parameters:
-    type: lai_franka_controllers/JointPdVelocityController
-
-hqp_cartesian_controller:
-  ros__parameters:
-    type: lai_franka_controllers/HqpCartesianVelocityController
-
-cartesian_controller:
-  ros__parameters:
-    type: lai_franka_controllers/CartesianVelocityController
-
-```
-
-### Step 2: Launch the Robot / Simulation
-
-Launch the Franka environment with the modern `joint_pd_velocity_controller` active.
+Launch the robot or Gazebo simulation using the tracking controller. Make sure `joint_pd_velocity_controller` is registered in your `controllers.yaml`.
 
 **For Real Hardware:**
-
 ```bash
 ros2 launch franka__bringup example.launch.py \
     controller:=joint_pd_velocity_controller \
@@ -99,7 +87,6 @@ ros2 launch franka__bringup example.launch.py \
 ```
 
 **For Gazebo Simulation:**
-
 ```bash
 ros2 launch franka_gazebo_bringup gazebo_franka_arm_example_controller.launch.py \
     controller:=joint_pd_velocity_controller \
@@ -107,90 +94,24 @@ ros2 launch franka_gazebo_bringup gazebo_franka_arm_example_controller.launch.py
 
 ```
 
-*(Note: To use the legacy controllers, replace `joint_pd_velocity_controller` with `my_hqp_cartesian_controller` or `my_cartesian_controller` in the commands above).*
+### 2. Start the HQP Optimization Engine
 
----
-
-### Scenario A: Diagnostic Hardware Test (Sine Wave)
-
-To verify that the PD controller is tracking perfectly before using Cartesian commands, launch the diagnostic sine publisher:
-
-```bash
-# Ensure the robot is launched with joint_pd_velocity_controller
-ros2 run lai_franka_controllers joint_sine_publisher_node
-
-```
-
----
-
-### Scenario B: Automated Cartesian Trajectories (HQP + Quintic Planner)
-
-This is the standard usage. The HQP node generates safe references, and the trajectory generator feeds it goals.
-
-**Terminal 1: Start the HQP Virtual Model Solver**
+In a new terminal, launch the virtual reference generator. This node reads the robot states, evaluates the `task` matrices, solves the Gurobi HQP constraints, and streams safe targets to the PD controller.
 
 ```bash
 ros2 launch lai_franka_controllers hqp_node.launch.py
 
 ```
 
-*(This loads boundaries from `hqp_node_params.yaml` and connects to the PD controller).*
+### 3. Send Goals (Trajectories or Teleoperation)
 
-**Terminal 2: Start the Trajectory Generator**
+With the safety boundaries active, you can safely interact with the robot:
 
 ```bash
+# Option A: Automated Quintic Trajectories and Stress Tests
 ros2 run lai_franka_controllers trajectory_generator_node
 
-```
-
-* **Send a Goal:** Publish to `/goal_pose`. The node generates a smooth quintic trajectory.
-* **Stress Test:** Publish a goal with a negative Z-value (`z < 0.0`) to trigger the automated multi-waypoint HQP boundary stress test sequence.
-
----
-
-### Scenario C: Gamepad Teleoperation (HQP + Joy)
-
-Safely drive the robot around with an Xbox/Logitech controller. The HQP node will automatically stop you from crashing into virtual walls or self-colliding.
-
-**Terminal 1: Start the HQP Virtual Model Solver**
-
-```bash
-ros2 launch lai_franka_controllers hqp_node.launch.py
-
-```
-
-**Terminal 2: Start the Teleoperation Suite**
-
-```bash
+# Option B: Xbox/Logitech Gamepad Teleoperation
 ros2 launch lai_franka_controllers joy_teleop.launch.py
 
 ```
-
-*(This loads configurations from `joy_teleop_params.yaml`. **Note:** If you are running inside WSL2 and standard `/dev/input/js0` fails, open `joy_teleop.launch.py` and uncomment the `raw_usb_joy_node` section to enable direct USB polling).*
-
-**Gamepad Controls:**
-
-* **Left Stick:** Cartesian X / Y Translation
-* **Triggers (LT/RT):** Cartesian Z Translation
-* **Right Stick:** Cartesian Pitch / Roll
-* **Bumpers (LB/RB):** Cartesian Yaw
-* **D-Pad Left/Right:** Live Speed Scaling (5% to 100%)
-* **A Button:** Toggle Franka Gripper (Grasp / Open)
-
----
-
-## Diagnostics & Monitoring
-
-The HQP Reference generator streams lock-free diagnostics for visualization. Open PlotJuggler to monitor system health:
-
-```bash
-ros2 run plotjuggler plotjuggler
-
-```
-
-**Key Diagnostic Topics:**
-
-* `~/hqp_reference_generator_node/tracking_error` *(Twist error between virtual and physical)*
-* `~/hqp_reference_generator_node/virtual_wall_distances` *(Array of distances to the 6D box)*
-* `~/hqp_reference_generator_node/self_hits_distances` *(Distance between EE and Base)*
-* `/joint_pd_velocity_controller/output_dq_cmd` *(Actual commands sent to hardware)*

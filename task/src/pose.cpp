@@ -65,15 +65,15 @@ Eigen::MatrixXd Pose::get_DLS_quadratic_objective_matrix(const Eigen::MatrixXd& 
     Eigen::JacobiSVD<Eigen::MatrixXd> SVD(J_in.transpose() * J_in, Eigen::ComputeFullU | Eigen::ComputeFullV);
     Eigen::MatrixXd V = SVD.matrixV();
     
-    // Clear numeric chatter under 1e-5 thresholds
-    V = (V.array().abs() < 1e-5).select(0.0, V); 
+    // Clear numeric chatter under 1e-4 thresholds
+    V = (V.array().abs() < 1e-4).select(0.0, V); 
 
     Eigen::VectorXd singular_values = SVD.singularValues();
     Eigen::VectorXd eigen_values = Eigen::VectorXd::Zero(singular_values.size());
     Eigen::MatrixXd delta_S = Eigen::MatrixXd::Zero(J_in.cols(), J_in.cols());
 
     for (int i = 0; i < eigen_values.size(); i++) {
-        if (std::abs(singular_values(i)) < 1e-5) {
+        if (std::abs(singular_values(i)) < 1e-4) {
             singular_values(i) = 0.0;
         }
 

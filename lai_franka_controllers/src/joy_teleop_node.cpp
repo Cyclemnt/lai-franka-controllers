@@ -194,7 +194,7 @@ void JoyTeleopNode::timer_callback() {
         current_vel += std::clamp(error, -max_step, max_step);
     };
 
-    update_axis_velocity(cmd_x_, cmd_y_ = static_cast<double>(cmd_y_), v_max, accel_limit_trans, joystick_deadzone);
+    update_axis_velocity(cmd_x_, current_vel_x_, v_max, accel_limit_trans, joystick_deadzone);
     update_axis_velocity(cmd_y_, current_vel_y_, v_max, accel_limit_trans, joystick_deadzone);
     update_axis_velocity(cmd_z_, current_vel_z_, v_max, accel_limit_trans, joystick_deadzone);
 

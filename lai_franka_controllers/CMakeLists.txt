@@ -143,6 +143,12 @@ target_include_directories(hqp_reference_generator_node PUBLIC ${PACKAGE_INCLUDE
 target_link_libraries(hqp_reference_generator_node ${PROJECT_NAME}_lib ${msg_typesupport_target})
 ament_target_dependencies(hqp_reference_generator_node rclcpp geometry_msgs sensor_msgs std_msgs task qp hierarchical_qp robot_kinematics auxiliaries_function_and_structures)
 
+# Core HQP Position Test Node (100 Hz Test)
+add_executable(hqp_position_test_node src/hqp_position_test_node.cpp)
+target_include_directories(hqp_position_test_node PUBLIC ${PACKAGE_INCLUDE_DIRS})
+target_link_libraries(hqp_position_test_node ${PROJECT_NAME}_lib ${msg_typesupport_target})
+ament_target_dependencies(hqp_position_test_node rclcpp geometry_msgs sensor_msgs std_msgs task qp hierarchical_qp robot_kinematics auxiliaries_function_and_structures)
+
 # ==========================================
 # PLUGIN REGISTRATION AND INSTALLATION BLOCKS
 # ==========================================
@@ -163,6 +169,7 @@ install(TARGETS
   trajectory_generator_node 
   joint_sine_publisher_node
   hqp_reference_generator_node
+  hqp_position_test_node
   DESTINATION lib/${PROJECT_NAME}
 )
 

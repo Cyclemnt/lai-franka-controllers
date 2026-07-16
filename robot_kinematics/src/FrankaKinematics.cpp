@@ -50,7 +50,7 @@ Eigen::VectorXd FrankaKinematics::getPreviousVelocities() const {
 Eigen::MatrixXd FrankaKinematics::getJacobian() const {
     double J_raw[42];
     Jacobian_mDH(mDH_table_, A7e_matrix_, J_raw);
-    return Eigen::Map<const Eigen::Matrix<double, 6, 7, Eigen::RowMajor>>(J_raw);
+    return Eigen::Map<const Eigen::Matrix<double, 6, 7>>(J_raw);
 }
 
 Eigen::Vector3d FrankaKinematics::getJointPosition(int joint_index) const {
@@ -102,7 +102,7 @@ Eigen::VectorXd FrankaKinematics::getError() const {
     DirectKinematics_mDH(mDH_table_, A7e_matrix_, T0_raw);
 
     // Frame index 7 maps target properties straight onto end-effector matrices entries [96-111]
-    Eigen::Map<const Eigen::Matrix<double, 4, 4, Eigen::RowMajor>> T_ee(&T0_raw[96]);
+    Eigen::Map<const Eigen::Matrix<double, 4, 4>> T_ee(&T0_raw[96]);
     
     Eigen::Vector3d pos_curr = T_ee.block<3,1>(0,3);
     Eigen::Matrix3d rot_curr = T_ee.block<3,3>(0,0);
@@ -126,7 +126,7 @@ Eigen::VectorXd FrankaKinematics::getPose() const {
     double T0_raw[112];
     DirectKinematics_mDH(mDH_table_, A7e_matrix_, T0_raw);
     
-    Eigen::Map<const Eigen::Matrix<double, 4, 4, Eigen::RowMajor>> T_ee(&T0_raw[96]);
+    Eigen::Map<const Eigen::Matrix<double, 4, 4>> T_ee(&T0_raw[96]);
     
     Eigen::Vector3d pos_curr = T_ee.block<3,1>(0,3);
     Eigen::Matrix3d rot_curr = T_ee.block<3,3>(0,0);
@@ -146,7 +146,7 @@ Eigen::Vector3d FrankaKinematics::getPosition() const {
     double T0_raw[112];
     DirectKinematics_mDH(mDH_table_, A7e_matrix_, T0_raw);
     
-    Eigen::Map<const Eigen::Matrix<double, 4, 4, Eigen::RowMajor>> T_ee(&T0_raw[96]);
+    Eigen::Map<const Eigen::Matrix<double, 4, 4>> T_ee(&T0_raw[96]);
     return T_ee.block<3,1>(0,3);
 }
 
@@ -154,7 +154,7 @@ Eigen::Quaterniond FrankaKinematics::getQuaternion() const {
     double T0_raw[112];
     DirectKinematics_mDH(mDH_table_, A7e_matrix_, T0_raw);
     
-    Eigen::Map<const Eigen::Matrix<double, 4, 4, Eigen::RowMajor>> T_ee(&T0_raw[96]);
+    Eigen::Map<const Eigen::Matrix<double, 4, 4>> T_ee(&T0_raw[96]);
     Eigen::Matrix3d rot_curr = T_ee.block<3,3>(0,0);
     Eigen::Quaterniond quat_curr(rot_curr);
     

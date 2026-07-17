@@ -1,23 +1,23 @@
-/// @file jointSineTask.cpp
+/// @file jointSine.cpp
 /// @brief Sinusoidal evaluation loop implementation.
 
-#include "task/jointSineTask.hpp"
+#include "task/jointSine.hpp"
 #include <cmath>
 
 namespace task {
 
-JointSineTask::JointSineTask() {
+jointSine::jointSine() {
     current_time_ = 0.0;
     A_matrix_ = Eigen::MatrixXd::Identity(7, 7);
     b_vector_ = Eigen::VectorXd::Zero(7);
     constraintSense_ = '=';
 }
 
-void JointSineTask::set_time(double t) {
+void jointSine::set_time(double t) {
     current_time_ = t;
 }
 
-void JointSineTask::update() {
+void jointSine::update() {
     // Parameter tables defining complex, pseudo-random joint excitation trajectories
     double a[6] = {0.35, 0.30, 0.25, 0.20, 0.15, 0.12}; 
     double f[6] = {0.03, 0.07, 0.11, 0.17, 0.23, 0.29};

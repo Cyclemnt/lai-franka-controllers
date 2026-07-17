@@ -57,17 +57,28 @@ public:
 
 private:
     /// @struct TargetPose
-    /// @brief Thread-safe encapsulation mapping input tracking targets across real-time loop cycles.
+    /// @brief Thread-safe encapsulation mapping input cartesian tracking targets across real-time loop cycles.
     struct TargetPose {
         Eigen::Vector3d position;
         Eigen::Quaterniond orientation;
         bool valid{false};
     };
 
+    /// @struct TargetJoint
+    /// @brief Thread-safe encapsulation mapping input joint tracking targets across real-time loop cycles.
+    struct TargetJoint {
+        Eigen::Matrix<double, 7, 1> q{Eigen::Matrix<double, 7, 1>::Zero()};
+        Eigen::Matrix<double, 7, 1> dq{Eigen::Matrix<double, 7, 1>::Zero()};
+        bool valid{false};
+    };
+
     // ---- Configuration Property Buffers ----
     std::vector<std::string> joint_names_;
+    std::string task_mode_;
     rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr target_pose_sub_;
     realtime_tools::RealtimeBuffer<TargetPose> rt_target_pose_ptr_;
+    rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr target_joint_sub_;
+    realtime_tools::RealtimeBuffer<TargetJoint> rt_target_joint_ptr_;
 
     // ---- Lock-Free Diagnostics Transmission Interfaces ----
     std::shared_ptr<rclcpp::Publisher<geometry_msgs::msg::TwistStamped>> error_pub_;
@@ -99,7 +110,7 @@ private:
     std::shared_ptr<VirtualWall> virtual_wall_task_5_;
     std::shared_ptr<VirtualWall> virtual_wall_task_6_;
     std::shared_ptr<Pose> pose_task_;
-    std::shared_ptr<JointSineTask> sine_task_;
+    std::shared_ptr<JointTracking> joint_tracking_task_;
 
     // ---- Real-time Math State Vectors (7-DOF Space Requirements) ----
     Eigen::Matrix<double, 7, 1> q_current_;
@@ -110,6 +121,8 @@ private:
     
     Eigen::Vector3d x_target_;
     Eigen::Quaterniond quat_target_;
+    Eigen::Matrix<double, 7, 1> q_target_;
+    Eigen::Matrix<double, 7, 1> dq_target_;
 
     // ---- Timing Watchdogs and Guard Gates ----
     rclcpp::Time last_target_time_{0};

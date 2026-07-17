@@ -25,7 +25,7 @@ The package optimizes real-time performance by aggressively pre-allocating memor
 ### Operational Objectives (Soft Priorities)
 
 * **`Pose`**: Solves 6D Cartesian tracking errors (position and/or orientation) and projects them into joint velocities. Features a built-in Damped Least Squares (DLS) singularity robustness filter.
-* **`JointSineTask`**: A diagnostic trajectory generator that superimposes multi-frequency Fourier sine waves to safely excite all joints for system identification.
+* **`jointSine`**: A diagnostic trajectory generator that superimposes multi-frequency Fourier sine waves to safely excite all joints for system identification.
 
 ## Dependencies
 

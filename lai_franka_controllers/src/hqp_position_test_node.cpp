@@ -201,7 +201,7 @@ HqpPositionTestNode::HqpPositionTestNode() : Node("hqp_position_test_node") {
         "/joint_states", 10, std::bind(&HqpPositionTestNode::joint_state_callback, this, std::placeholders::_1));
 
     // Execution step scheduled at 100 Hz
-    timer_ = this->create_wall_timer(10ms, std::bind(&HqpPositionTestNode::timer_callback, this));
+    timer_ = this->create_wall_timer(10ms, std::bind(&HqpPositionTestNode::timer_callback, this)); // TODO: try again on the robot with higher frequency than 100 Hz
 
     RCLCPP_INFO(this->get_logger(), "100 Hz Position Node Initialized. Awaiting frame alignment from /joint_states...");
 }

@@ -43,7 +43,9 @@ controller_interface::CallbackReturn HqpCartesianVelocityController::on_init() {
     declare_if_not_exists("virtual_walls.left_y", 0.3);
     declare_if_not_exists("virtual_walls.right_y", -0.3);
 
-    declare_if_not_exists("pose_tracking.gain", 5.0);
+    declare_if_not_exists("primary_task.mode", std::string("cartesian"));
+    declare_if_not_exists("primary_task.priority", 4);
+    declare_if_not_exists("primary_task.gain", 5.0);
 
     return controller_interface::CallbackReturn::SUCCESS;
 }
@@ -177,28 +179,52 @@ controller_interface::CallbackReturn HqpCartesianVelocityController::on_configur
     }
 
     // ==========================================
-    // PRIORITY LEVEL 4: SOFT CONVERGENCE TASKS
+    // PRIORITY LEVEL 4: PRIMARY TRACKING TASK (CONDITIONAL)
     // ==========================================
-    double pose_gain = node->get_parameter("pose_tracking.gain").as_double();
-    pose_task_ = std::make_shared<Pose>(kinematics_.get(), GRB_EQUAL, Eigen::VectorXd::Ones(6), pose_gain);
-    pose_task_->setPriorityLevel(4);
-    pose_task_->setSlacksState(true);
-    task_stack_.push_back(pose_task_);
+    task_mode_ = node->get_parameter("primary_task.mode").as_string();
+    int task_priority = static_cast<int>(node->get_parameter("primary_task.priority").as_int());
+    double task_gain = node->get_parameter("primary_task.gain").as_double();
 
-    sine_task_ = std::make_shared<JointSineTask>();
-    sine_task_->setPriorityLevel(4);
-    sine_task_->setSlacksState(true);
-    // task_stack_.push_back(sine_task_);
-    
-    // Lock-free safe real-time subscriber pipeline mapping tracking sets
-    target_pose_sub_ = node->create_subscription<geometry_msgs::msg::PoseStamped>("~/target_pose", 10,
-        [this](const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
-            TargetPose target;
-            target.position << msg->pose.position.x, msg->pose.position.y, msg->pose.position.z;
-            target.orientation = Eigen::Quaterniond(msg->pose.orientation.w, msg->pose.orientation.x, msg->pose.orientation.y, msg->pose.orientation.z).normalized();
-            target.valid = true;
-            rt_target_pose_ptr_.writeFromNonRT(target);
-        });
+    if (task_mode_ == "cartesian") {
+        pose_task_ = std::make_shared<Pose>(kinematics_.get(), GRB_EQUAL, Eigen::VectorXd::Ones(6), task_gain);
+        pose_task_->setPriorityLevel(task_priority);
+        pose_task_->setSlacksState(true);
+        task_stack_.push_back(pose_task_);
+
+        target_pose_sub_ = node->create_subscription<geometry_msgs::msg::PoseStamped>("~/target_pose", 10,
+            [this](const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
+                TargetPose target;
+                target.position << msg->pose.position.x, msg->pose.position.y, msg->pose.position.z;
+                target.orientation = Eigen::Quaterniond(msg->pose.orientation.w, msg->pose.orientation.x, msg->pose.orientation.y, msg->pose.orientation.z).normalized();
+                target.valid = true;
+                rt_target_pose_ptr_.writeFromNonRT(target);
+            });
+            
+        RCLCPP_INFO(node->get_logger(), "Primary Task Mode: Cartesian Pose Tracking");
+    } 
+    else if (task_mode_ == "joint") {
+        joint_tracking_task_ = std::make_shared<JointTracking>(kinematics_.get(), GRB_EQUAL, task_gain);
+        joint_tracking_task_->setPriorityLevel(task_priority);
+        joint_tracking_task_->setSlacksState(true);
+        task_stack_.push_back(joint_tracking_task_);
+
+        target_joint_sub_ = node->create_subscription<sensor_msgs::msg::JointState>("~/target_joint", 10,
+            [this](const sensor_msgs::msg::JointState::SharedPtr msg) {
+                TargetJoint target;
+                for (size_t i = 0; i < 7 && i < msg->position.size(); ++i) {
+                    target.q(i) = msg->position[i];
+                    target.dq(i) = (msg->velocity.empty()) ? 0.0 : msg->velocity[i];
+                }
+                target.valid = true;
+                rt_target_joint_ptr_.writeFromNonRT(target);
+            });
+
+        RCLCPP_INFO(node->get_logger(), "Primary Task Mode: Joint Space Tracking");
+    } 
+    else {
+        RCLCPP_ERROR(node->get_logger(), "Invalid primary_task.mode. Must be 'cartesian' or 'joint'.");
+        return controller_interface::CallbackReturn::ERROR;
+    }
 
     error_pub_ = node->create_publisher<geometry_msgs::msg::TwistStamped>("~/tracking_error", rclcpp::SystemDefaultsQoS());
     rt_error_pub_ = std::make_shared<realtime_tools::RealtimePublisher<geometry_msgs::msg::TwistStamped>>(error_pub_);
@@ -246,6 +272,8 @@ controller_interface::CallbackReturn HqpCartesianVelocityController::on_activate
     // Initialize boundary states to current actual positions to eliminate initialization errors
     x_target_ = kinematics_->getPosition();
     quat_target_ = kinematics_->getQuaternion();
+    q_target_ = q_current_;
+    dq_target_ = Eigen::VectorXd::Zero(7);
 
     last_target_time_ = get_node()->now();
 
@@ -261,19 +289,30 @@ controller_interface::CallbackReturn HqpCartesianVelocityController::on_deactiva
 controller_interface::return_type HqpCartesianVelocityController::update(const rclcpp::Time& time, const rclcpp::Duration& /*period*/) {
     
     // Acquire non-blocking reference configurations targets snapshot pointers
-    TargetPose* target_ptr = rt_target_pose_ptr_.readFromRT();
+    TargetPose* target_ptr = rt_target_pose_ptr_.readFromRT(); // Cartesian
     if (target_ptr && target_ptr->valid) {
         x_target_ = target_ptr->position;
         quat_target_ = target_ptr->orientation;
         last_target_time_ = time;
         target_ptr->valid = false;
     }
+    TargetJoint* joint_ptr = rt_target_joint_ptr_.readFromRT(); // Joint
+    if (joint_ptr && joint_ptr->valid) {
+        q_target_ = joint_ptr->q;
+        dq_target_ = joint_ptr->dq;
+        last_target_time_ = time;
+        joint_ptr->valid = false;
+    }
     
     // Read hardware inputs directly from peripheral interface links
     for (size_t i = 0; i < 7; ++i) { q_current_(i) = state_interfaces_[i].get_value(); }
 
     kinematics_->updateJointStates(q_current_);
-    kinematics_->setDesiredPose(x_target_, quat_target_);
+    if (task_mode_ == "cartesian") {
+        kinematics_->setDesiredPose(x_target_, quat_target_);
+    } else if (task_mode_ == "joint") {
+        joint_tracking_task_->set_desired_state(q_target_, dq_target_);
+    }
 
     // Execute sequential matrix optimization loops checks steps
     try {

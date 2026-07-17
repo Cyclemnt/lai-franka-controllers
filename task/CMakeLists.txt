@@ -42,7 +42,8 @@ add_library(${PROJECT_NAME} SHARED
   src/selfHits.cpp
   src/virtualWall.cpp
   src/pose.cpp
-  src/jointSineTask.cpp
+  src/jointTracking.cpp
+  src/jointSine.cpp
 )
 
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
@@ -52,11 +53,10 @@ target_include_directories(${PROJECT_NAME} PUBLIC
   $<INSTALL_INTERFACE:include>
   ${EIGEN3_INCLUDE_DIRS}
   ${GUROBI_INCLUDE_DIRS}
+  ${qp_INCLUDE_DIRS}
 )
 
-# Removed robot_kinematics_lib from here to let ament handle it
 target_link_libraries(${PROJECT_NAME}
-  qpsolver_lib
   ${GUROBI_CXX_LIBRARY}
   ${GUROBI_LIBRARY}
   OpenMP::OpenMP_CXX
@@ -78,11 +78,11 @@ target_include_directories(test_task_node PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/include
   ${EIGEN3_INCLUDE_DIRS}
   ${GUROBI_INCLUDE_DIRS}
+  ${qp_INCLUDE_DIRS}
 )
 
 target_link_libraries(test_task_node
   ${PROJECT_NAME}
-  qpsolver_lib
   ${GUROBI_CXX_LIBRARY}
   ${GUROBI_LIBRARY}
 )

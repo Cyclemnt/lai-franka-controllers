@@ -40,6 +40,7 @@ hqp_reference_generator_node:
       right_y: -0.5
 
     # Priority Level 4: Soft Task Tracking Gains Profiles Weight Settings
-    pose_tracking:
+    primary_task:
+      mode: "cartesian"  # Select "cartesian" or "joint"
       priority: 4
       gain: 5.0

@@ -63,10 +63,15 @@ private:
     /// @param msg Shared pointer to target geometry_msgs::msg::PoseStamped data.
     void target_pose_callback(const geometry_msgs::msg::PoseStamped::SharedPtr msg);
 
+    /// @brief 
+    /// @param msg 
+    void target_joint_callback(const sensor_msgs::msg::JointState::SharedPtr msg);
+
     // ---- ROS 2 Interface Variables ----
     rclcpp::TimerBase::SharedPtr timer_;
     rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_state_sub_;
     rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr target_pose_sub_;
+    rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr target_joint_sub_;
     
     rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_cmd_pub_;
     rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr error_pub_;
@@ -77,7 +82,10 @@ private:
     // ---- Synchronization and Operational Safeguards ----
     std::vector<std::string> joint_names_;
     std::mutex data_mutex_;
-    TargetPose current_target_;
+    std::string task_mode_;
+    TargetPose pose_target_;
+    Eigen::VectorXd target_q_;
+    Eigen::VectorXd target_dq_;
     bool is_initialized_{false};
     rclcpp::Time last_time_;
 
@@ -99,6 +107,7 @@ private:
     std::shared_ptr<VirtualWall> virtual_wall_task_5_;
     std::shared_ptr<VirtualWall> virtual_wall_task_6_;
     std::shared_ptr<Pose> pose_task_;
+    std::shared_ptr<task::JointTracking> joint_tracking_task_;
 
     // ---- Virtual Internal Model State Vectors (7-DOF Constraints) ----
     Eigen::Matrix<double, 7, 1> q_virtual_;

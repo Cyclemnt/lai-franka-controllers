@@ -1,4 +1,4 @@
-/// @file jointSineTask.hpp
+/// @file jointSine.hpp
 /// @brief Multi-frequency joint-space sinusoidal trajectory tracking task.
 /// @author Clement Lamouller
 /// @date 2026
@@ -10,15 +10,15 @@
 
 namespace task {
 
-/// @class JointSineTask
+/// @class jointSine
 /// @brief Generates complex multi-joint sinusoidal reference patterns for diagnostic validation.
-class JointSineTask : public Task {
+class jointSine : public Task {
 private:
     double current_time_;
 
 public:
     /// @brief Default constructor initializing pre-allocated 7-DOF identity mapping.
-    JointSineTask();
+    jointSine();
 
     /// @brief Syncs the current timestamp reference.
     void set_time(double t);

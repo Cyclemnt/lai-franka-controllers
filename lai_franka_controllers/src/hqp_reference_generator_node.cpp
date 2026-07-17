@@ -45,8 +45,9 @@ HqpReferenceGeneratorNode::HqpReferenceGeneratorNode() : Node("hqp_reference_gen
     declare_if_not_exists("virtual_walls.left_y", 0.5);
     declare_if_not_exists("virtual_walls.right_y", -0.5);
 
-    declare_if_not_exists("pose_tracking.priority", 4);
-    declare_if_not_exists("pose_tracking.gain", 5.0);
+    declare_if_not_exists("primary_task.mode", std::string("cartesian"));
+    declare_if_not_exists("primary_task.priority", 4);
+    declare_if_not_exists("primary_task.gain", 5.0);
 
     // Retrieve and map active joint limits directly onto Eigen boundary structures
     auto q_max_vec = this->get_parameter("joint_limits.q_max").as_double_array();
@@ -176,15 +177,38 @@ HqpReferenceGeneratorNode::HqpReferenceGeneratorNode() : Node("hqp_reference_gen
     }
 
     // ==========================================
-    // PRIORITY LEVEL 4: TASK POSE TRACKING
+    // PRIORITY LEVEL 4: PRIMARY TRACKING TASK (CONDITIONAL)
     // ==========================================
-    int pose_priority = static_cast<int>(this->get_parameter("pose_tracking.priority").as_int());
-    double pose_gain = this->get_parameter("pose_tracking.gain").as_double();
+    task_mode_ = this->get_parameter("primary_task.mode").as_string();
+    int task_priority = static_cast<int>(this->get_parameter("primary_task.priority").as_int());
+    double task_gain = this->get_parameter("primary_task.gain").as_double();
 
-    pose_task_ = std::make_shared<Pose>(kinematics_.get(), GRB_EQUAL, Eigen::VectorXd::Ones(6), pose_gain);
-    pose_task_->setPriorityLevel(pose_priority);
-    pose_task_->setSlacksState(true); 
-    task_stack_.push_back(pose_task_);
+    if (task_mode_ == "cartesian") {
+        pose_task_ = std::make_shared<Pose>(kinematics_.get(), GRB_EQUAL, Eigen::VectorXd::Ones(6), task_gain);
+        pose_task_->setPriorityLevel(task_priority);
+        pose_task_->setSlacksState(true); 
+        task_stack_.push_back(pose_task_);
+
+        target_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
+            "~/target_pose", 10, std::bind(&HqpReferenceGeneratorNode::target_pose_callback, this, std::placeholders::_1));
+            
+        RCLCPP_INFO(this->get_logger(), "Primary Task Mode: Cartesian Pose Tracking");
+    } 
+    else if (task_mode_ == "joint") {
+        joint_tracking_task_ = std::make_shared<task::JointTracking>(kinematics_.get(), GRB_EQUAL, task_gain);
+        joint_tracking_task_->setPriorityLevel(task_priority);
+        joint_tracking_task_->setSlacksState(true);
+        task_stack_.push_back(joint_tracking_task_);
+
+        target_joint_sub_ = this->create_subscription<sensor_msgs::msg::JointState>(
+            "~/target_joint", 10, std::bind(&HqpReferenceGeneratorNode::target_joint_callback, this, std::placeholders::_1));
+
+        RCLCPP_INFO(this->get_logger(), "Primary Task Mode: Joint Space Tracking");
+    } 
+    else {
+        RCLCPP_ERROR(this->get_logger(), "Invalid primary_task.mode in YAML. Must be 'pose' or 'joint'.");
+        throw std::runtime_error("Invalid task mode");
+    }
 
     // Output and Diagnostic Pub Setup
     joint_cmd_pub_        = this->create_publisher<sensor_msgs::msg::JointState>("/joint_pd_velocity_controller/joint_commands", 10);
@@ -226,9 +250,12 @@ void HqpReferenceGeneratorNode::joint_state_callback(const sensor_msgs::msg::Joi
         q_virtual_ = Eigen::VectorXd::Map(initial_positions.data(), 7);
         kinematics_->updateJointStates(q_virtual_);
         
-        current_target_.position = kinematics_->getPosition();
-        current_target_.orientation = kinematics_->getQuaternion();
-        current_target_.valid = true;
+        pose_target_.position = kinematics_->getPosition();
+        pose_target_.orientation = kinematics_->getQuaternion();
+        pose_target_.valid = true;
+
+        target_q_ = q_virtual_;
+        target_dq_ = Eigen::VectorXd::Zero(7);
         
         last_time_ = this->get_clock()->now();
         is_initialized_ = true;
@@ -241,12 +268,20 @@ void HqpReferenceGeneratorNode::joint_state_callback(const sensor_msgs::msg::Joi
 
 void HqpReferenceGeneratorNode::target_pose_callback(const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
     std::lock_guard<std::mutex> lock(data_mutex_);
-    current_target_.position << msg->pose.position.x, msg->pose.position.y, msg->pose.position.z;
-    current_target_.orientation = Eigen::Quaterniond(msg->pose.orientation.w, 
+    pose_target_.position << msg->pose.position.x, msg->pose.position.y, msg->pose.position.z;
+    pose_target_.orientation = Eigen::Quaterniond(msg->pose.orientation.w, 
                                                      msg->pose.orientation.x, 
                                                      msg->pose.orientation.y, 
                                                      msg->pose.orientation.z).normalized();
-    current_target_.valid = true;
+    pose_target_.valid = true;
+}
+
+void HqpReferenceGeneratorNode::target_joint_callback(const sensor_msgs::msg::JointState::SharedPtr msg) {
+    std::lock_guard<std::mutex> lock(data_mutex_);
+    for (size_t i = 0; i < 7 && i < msg->position.size(); ++i) {
+        target_q_(i) = msg->position[i];
+        target_dq_(i) = (msg->velocity.empty()) ? 0.0 : msg->velocity[i];
+    }
 }
 
 void HqpReferenceGeneratorNode::timer_callback() {
@@ -256,19 +291,25 @@ void HqpReferenceGeneratorNode::timer_callback() {
     double dt = (current_time - last_time_).seconds();
     last_time_ = current_time;
 
-    // Secure local tracking coordinates copies under mutex control protection bounds
-    Eigen::Vector3d local_target_pos;
-    Eigen::Quaterniond local_target_ori;
-    {
+    // Secure local tracking target copies under mutex control protection bounds
+    if (task_mode_ == "cartesian") {
+        Eigen::Vector3d local_target_pos;
+        Eigen::Quaterniond local_target_ori;
+        {
+            std::lock_guard<std::mutex> lock(data_mutex_);
+            local_target_pos = pose_target_.position;
+            local_target_ori = pose_target_.orientation;
+        }
+        kinematics_->setDesiredPose(local_target_pos, local_target_ori);
+    } 
+    else if (task_mode_ == "joint") {
         std::lock_guard<std::mutex> lock(data_mutex_);
-        local_target_pos = current_target_.position;
-        local_target_ori = current_target_.orientation;
+        joint_tracking_task_->set_desired_state(target_q_, target_dq_);
     }
 
     // Integrate internal virtual model configurations frame definitions
     q_virtual_ += dq_hqp_ * dt;
     kinematics_->updateJointStates(q_virtual_);
-    kinematics_->setDesiredPose(local_target_pos, local_target_ori);
 
     // Solve multi-priority optimization problem
     try {

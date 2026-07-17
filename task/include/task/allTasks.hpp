@@ -12,6 +12,7 @@
 #include "task/selfHits.hpp"
 #include "task/virtualWall.hpp"
 #include "task/pose.hpp"
-#include "task/jointSineTask.hpp"
+#include "task/jointTracking.hpp"
+#include "task/jointSine.hpp"
 
 #endif // TASK__ALL_TASKS_HPP_

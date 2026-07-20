@@ -79,7 +79,7 @@ HqpReferenceGeneratorNode::HqpReferenceGeneratorNode() : Node("hqp_reference_gen
     if (mDH.size() == 28 && a7e.size() == 16) {
         kinematics_->setParameters(mDH, a7e);
     } else {
-        RCLCPP_ERROR(this->get_logger(), "DH Matrix dimension verification mismatch. Halt runtime initialization.");
+        RCLCPP_ERROR(this->get_logger(), "DH Matrix dimension verification mismatch in YAML.");
         throw std::runtime_error("Invalid DH Parameters");
     }
 
@@ -206,7 +206,7 @@ HqpReferenceGeneratorNode::HqpReferenceGeneratorNode() : Node("hqp_reference_gen
         RCLCPP_INFO(this->get_logger(), "Primary Task Mode: Joint Space Tracking");
     } 
     else {
-        RCLCPP_ERROR(this->get_logger(), "Invalid primary_task.mode in YAML. Must be 'pose' or 'joint'.");
+        RCLCPP_ERROR(this->get_logger(), "Invalid primary_task.mode in YAML. Must be 'cartesian' or 'joint'.");
         throw std::runtime_error("Invalid task mode");
     }
 
@@ -262,7 +262,7 @@ void HqpReferenceGeneratorNode::joint_state_callback(const sensor_msgs::msg::Joi
         
         // Sever joint subscription dependencies to minimize execution thread overhead
         joint_state_sub_.reset();
-        RCLCPP_INFO(this->get_logger(), "Internal Reference Map Aligned. HQP Optimization Matrix Processing Active.");
+        RCLCPP_INFO(this->get_logger(), "Internal Reference Map Aligned. HQP Active.");
     }
 }
 
@@ -339,7 +339,7 @@ void HqpReferenceGeneratorNode::timer_callback() {
         dq_hqp_ = solver_->getVarsValue();
         solver_->reset();
     } catch (const std::exception& e) {
-        RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Optimization Failure Matrix Intercepted: %s", e.what());
+        RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Optimization Failure Intercepted: %s", e.what());
         dq_hqp_.setZero();
         solver_->reset();
     }

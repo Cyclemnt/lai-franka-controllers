@@ -8,7 +8,7 @@ It defines an abstract, polymorphic `Task` architecture that maps physical robot
 
 Every task inherits from the virtual `Task` base class and is responsible for formulating its objective into either an equality or inequality constraint for the solver:
 
-* **Equality Tasks** ($A \dot{q} = b$): Used for strict tracking (e.g., reaching a specific Cartesian pose).
+* **Equality Tasks** ($A \dot{q} = b$): Used for strict tracking (e.g., reaching a specific Cartesian pose or joint target).
 * **Inequality Tasks** ($A \dot{q} \le b$): Used for safety boundaries (e.g., joint limits, collision avoidance).
 
 The package optimizes real-time performance by aggressively pre-allocating memory during instantiation and passing operations via `Eigen::noalias()` to prevent heap allocations during the 1 kHz control loop.
@@ -25,7 +25,8 @@ The package optimizes real-time performance by aggressively pre-allocating memor
 ### Operational Objectives (Soft Priorities)
 
 * **`Pose`**: Solves 6D Cartesian tracking errors (position and/or orientation) and projects them into joint velocities. Features a built-in Damped Least Squares (DLS) singularity robustness filter.
-* **`jointSine`**: A diagnostic trajectory generator that superimposes multi-frequency Fourier sine waves to safely excite all joints for system identification.
+* **`JointTracking`**: Solves direct joint-space trajectory tracking. Incorporates both position targeting and dynamic feedforward velocity tracking for zero-lag trajectory execution.
+* **`jointSine`**: A diagnostic trajectory generator that superimposes multi-frequency Fourier sine waves to safely excite joints.
 
 ## Dependencies
 
@@ -90,7 +91,7 @@ Eigen::VectorXd b = wall_task->get_b();
 
 ## Build Instructions
 
-To ensure the matrix multiplications resolve within the strict 1 ms hardware loop, `-O3` optimizations are enforced. Build in `Release` mode:
+To ensure the matrix multiplications resolve within the strict hardware execution loops, `-O3` optimizations are enforced. Build in `Release` mode:
 
 ```bash
 cd ~/franka_ros2_ws/
@@ -100,5 +101,3 @@ rm -rf build/task install/task
 
 # Build the task library
 colcon build --packages-select task --cmake-args -DCMAKE_BUILD_TYPE=Release
-
-```

@@ -103,15 +103,54 @@ ros2 launch lai_franka_controllers hqp_node.launch.py
 
 ```
 
-### 3. Send Goals (Trajectories or Teleoperation)
+### 3. Send Goals (Trajectories, Teleoperation, or Diagnostics)
 
-With the safety boundaries active, you can safely interact with the robot:
+With the safety boundaries active, you can safely interact with the robot using automated nodes, teleoperation, or by publishing manual targets directly from the command line.
+
+#### Method A: Standalone Applications
+Ensure your `primary_task.mode` setting in `hqp_node_params.yaml` matches the space you are commanding (e.g., `"cartesian"` or `"joint"`).
 
 ```bash
-# Option A: Automated Quintic Trajectories and Stress Tests
+# Automated Quintic Trajectories and Boundary Stress Tests (Cartesian Mode)
 ros2 run lai_franka_controllers trajectory_generator_node
 
-# Option B: Xbox/Logitech Gamepad Teleoperation
+# Xbox/Logitech Gamepad Teleoperation (Cartesian Mode)
 ros2 launch lai_franka_controllers joy_teleop.launch.py
 
+# Multi-Joint Feedforward Sinusoidal Diagnostics (Joint Mode)
+ros2 run lai_franka_controllers hqp_joint_trajectory_test_node
+
 ```
+
+#### Method B: Manual Command-Line (CLI) Target Injection
+
+You can manually publish static targets directly to the HQP stack or the active trajectory planner using the `--once` flag.
+
+* **For Cartesian Mode via the Trajectory Planner (Recommended):**
+  When the `trajectory_generator_node` is active, publish your target to the global `/goal_pose` topic. The planner will intercept this, calculate a smooth quintic S-curve trajectory profile, and feed it incrementally to the HQP layer:
+  ```bash
+  ros2 topic pub --once /goal_pose geometry_msgs/msg/PoseStamped \
+  "{header: {frame_id: 'fr3_link0'}, pose: {position: {x: 0.5, y: 0.1, z: 0.4}, orientation: {w: 1.0, x: 0.0, y: 0.0, z: 0.0}}}"
+    ```
+
+*(Note: Setting a negative Z-value like `z: -0.1` here will automatically trigger the multi-waypoint boundary boundary stress test).*
+
+
+* **For Cartesian Tracking Mode (Bypassing Planner):**
+Publish to the `/hqp_reference_generator_node/target_pose` topic. The solver will safely compute optimal joint velocities to track the 6D target:
+```bash
+ros2 topic pub --once /hqp_reference_generator_node/target_pose geometry_msgs/msg/PoseStamped \
+"{header: {frame_id: 'fr3_link0'}, pose: {position: {x: 0.4, y: 0.0, z: 0.4}, orientation: {w: 1.0, x: 0.0, y: 0.0, z: 0.0}}}"
+
+```
+
+
+* **For Joint Tracking Mode:**
+Publish to the `/hqp_reference_generator_node/target_joint` topic. The updated name-mapping parser routes the targets dynamically. Specify the exact joint name array along with target positions and optional feedforward velocities:
+```bash
+ros2 topic pub --once /hqp_reference_generator_node/target_joint sensor_msgs/msg/JointState \
+"{name: ['fr3_joint1'], position: [-1.5], velocity: [0.0]}"
+
+```
+
+> **Hardware Diagnostic Note:** If you need to verify the low-level physical tracking performance and bypass the HQP optimization stack entirely, you can stream commands directly to the hardware driver plugin topic (`/joint_pd_velocity_controller/joint_commands`) by running `ros2 run lai_franka_controllers joint_pd_test_node`.

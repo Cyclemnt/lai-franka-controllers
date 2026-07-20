@@ -132,10 +132,10 @@ target_link_libraries(raw_usb_joy_node ${LIBUSB1_LIBRARIES})
 ament_target_dependencies(raw_usb_joy_node rclcpp sensor_msgs)
 
 # Diagnostics Waveform Publisher
-add_executable(joint_sine_publisher_node src/joint_sine_publisher_node.cpp)
-target_include_directories(joint_sine_publisher_node PUBLIC ${PACKAGE_INCLUDE_DIRS})
-target_link_libraries(joint_sine_publisher_node ${PROJECT_NAME}_lib)
-ament_target_dependencies(joint_sine_publisher_node rclcpp sensor_msgs)
+add_executable(joint_pd_test_node src/joint_pd_test_node.cpp)
+target_include_directories(joint_pd_test_node PUBLIC ${PACKAGE_INCLUDE_DIRS})
+target_link_libraries(joint_pd_test_node ${PROJECT_NAME}_lib)
+ament_target_dependencies(joint_pd_test_node rclcpp sensor_msgs)
 
 # Core HQP Reference Optimization Node
 add_executable(hqp_reference_generator_node src/hqp_reference_generator_node.cpp)
@@ -172,7 +172,7 @@ install(TARGETS
   raw_usb_joy_node 
   joy_teleop_node 
   trajectory_generator_node 
-  joint_sine_publisher_node
+  joint_pd_test_node
   hqp_reference_generator_node
   hqp_position_test_node
   hqp_joint_trajectory_test_node

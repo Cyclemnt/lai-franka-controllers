@@ -1,7 +1,7 @@
-/// @file joint_sine_publisher_node.cpp
+/// @file joint_pd_test_node.cpp
 /// @brief Diagnostic trajectory calculation and system tracking loop details.
 
-#include "lai_franka_controllers/joint_sine_publisher_node.hpp"
+#include "lai_franka_controllers/joint_pd_test_node.hpp"
 #include <cmath>
 
 using namespace std::chrono_literals;

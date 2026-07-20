@@ -1,10 +1,10 @@
-/// @file joint_sine_publisher_node.hpp
+/// @file joint_pd_test_node.hpp
 /// @brief Joint space diagnostic sine-wave command publisher node for Franka FR3.
 /// @author Clement Lamouller
 /// @date 2026
 
-#ifndef LAI_FRANKA_CONTROLLERS__JOINT_SINE_PUBLISHER_NODE_HPP_
-#define LAI_FRANKA_CONTROLLERS__JOINT_SINE_PUBLISHER_NODE_HPP_
+#ifndef LAI_FRANKA_CONTROLLERS__JOINT_PD_TEST_NODE_HPP_
+#define LAI_FRANKA_CONTROLLERS__JOINT_PD_TEST_NODE_HPP_
 
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
@@ -56,4 +56,4 @@ private:
 
 } // namespace lai_franka_controllers
 
-#endif // LAI_FRANKA_CONTROLLERS__JOINT_SINE_PUBLISHER_NODE_HPP_
+#endif // LAI_FRANKA_CONTROLLERS__JOINT_PD_TEST_NODE_HPP_

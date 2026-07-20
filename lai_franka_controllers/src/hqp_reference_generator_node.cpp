@@ -278,9 +278,25 @@ void HqpReferenceGeneratorNode::target_pose_callback(const geometry_msgs::msg::P
 
 void HqpReferenceGeneratorNode::target_joint_callback(const sensor_msgs::msg::JointState::SharedPtr msg) {
     std::lock_guard<std::mutex> lock(data_mutex_);
-    for (size_t i = 0; i < 7 && i < msg->position.size(); ++i) {
-        target_q_(i) = msg->position[i];
-        target_dq_(i) = (msg->velocity.empty()) ? 0.0 : msg->velocity[i];
+    
+    for (size_t i = 0; i < msg->name.size(); ++i) {
+        // Find which index this joint name corresponds to in our internal target array
+        for (size_t j = 0; j < joint_names_.size(); ++j) {
+            if (msg->name[i] == joint_names_[j]) {
+                
+                if (i < msg->position.size()) {
+                    target_q_(j) = msg->position[i];
+                }
+                
+                if (i < msg->velocity.size()) {
+                    target_dq_(j) = msg->velocity[i];
+                } else {
+                    target_dq_(j) = 0.0; 
+                }
+                
+                break; // Move to the next joint in the incoming message
+            }
+        }
     }
 }
 

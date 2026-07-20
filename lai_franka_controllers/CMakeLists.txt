@@ -149,6 +149,11 @@ target_include_directories(hqp_position_test_node PUBLIC ${PACKAGE_INCLUDE_DIRS}
 target_link_libraries(hqp_position_test_node ${PROJECT_NAME}_lib ${msg_typesupport_target})
 ament_target_dependencies(hqp_position_test_node rclcpp geometry_msgs sensor_msgs std_msgs task qp hierarchical_qp robot_kinematics auxiliaries_function_and_structures)
 
+# Joint Trajectory Test Node
+add_executable(joint_trajectory_test_node src/joint_trajectory_test_node.cpp)
+target_include_directories(joint_trajectory_test_node PRIVATE include)
+ament_target_dependencies(joint_trajectory_test_node rclcpp sensor_msgs geometry_msgs)
+
 # ==========================================
 # PLUGIN REGISTRATION AND INSTALLATION BLOCKS
 # ==========================================
@@ -170,6 +175,7 @@ install(TARGETS
   joint_sine_publisher_node
   hqp_reference_generator_node
   hqp_position_test_node
+  joint_trajectory_test_node
   DESTINATION lib/${PROJECT_NAME}
 )
 

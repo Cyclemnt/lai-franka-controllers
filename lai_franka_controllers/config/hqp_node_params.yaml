@@ -15,18 +15,21 @@ hqp_reference_generator_node:
 
     # Priority Level 1: Hard Joint State Saturation Threshold Constraints Limits
     joint_limits:
+      enabled: true
       q_max: [2.897, 1.832, 2.897, -0.122, 2.879, 4.625, 3.054]
       q_min: [-2.897, -1.832, -2.897, -3.071, -2.879, 0.436, -3.054]
       dq_max: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
 
     # Priority Level 2: Self-Collision Fields
     self_collision:
+      enabled: true
       safe_points: [6]            # End-Effector Tracking Node Points
       avoid_points: [0, 3]        # Base and Elbow Structural Segment Nodes
       min_distance: 0.3           # Minimum allowed safe spatial distance offset (meters)
 
     # Priority Level 3: Enclosed 6-Sided Virtual Workspace Box Planes
     virtual_walls:
+      enabled: true
       joints_to_protect: [3, 7]   # Active link configurations monitored for proximity updates
       margin: 0.05                # Safe distance buffer threshold (d_min meters)
       gain: 1.0                   # Repulsion velocity field multiplier scaling profile
@@ -41,6 +44,7 @@ hqp_reference_generator_node:
 
     # Priority Level 4: Soft Task Tracking Gains Profiles Weight Settings
     primary_task:
+      enabled: true
       mode: "cartesian"  # Select "cartesian" or "joint"
       priority: 4
       gain: 5.0

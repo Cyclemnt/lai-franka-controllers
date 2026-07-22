@@ -16,7 +16,7 @@ This repository contains three core packages that work together to control the r
 | **`task`** | Mathematical constraints formulation engine. Maps physical objectives (Pose tracking, Virtual Walls, Self-Collision) into standard $A$ and $b$ matrices for the solver. |
 | **`robot_kinematics`** | High-performance, codegen-backed analytical kinematics engine providing real-time Jacobians, forward kinematics, and shortest-path error tracking. |
 
-*(For detailed information on each module, please refer to the individual `README.md` files located inside each package folder).*
+***(For localized information on each module, please refer to the individual `README.md` files located inside each package folder).***
 
 ---
 
@@ -68,25 +68,36 @@ source install/setup.bash
 
 ---
 
-## Quick Start & Launch Architecture
+## Configuration Profiles (`.yaml`)
 
-The architecture utilizes a decoupled **Internal Model Control (IMC)** approach. The mathematical bounds are resolved inside an isolated virtual reference generator, which then streams safe trajectories to a lean Joint PD Feedforward controller.
+The behavior of the HQP solver and Teleoperation suite is heavily parameterized. You can adjust kinematic models, safety limits, and tuning gains via their respective YAML files in `lai_franka_controllers/config/` without recompiling.
 
-### 1. Hardware / Simulation Bringup
+* **`hqp_node_params.yaml`**: Governs the mathematical constraints of the HQP solver. Adjusts the modified DH parameters, End-Effector TCP offset, joint velocity/position limits, self-collision safety buffers, and the 6-sided virtual wall workspace boundary dimensions. This file also contains `enabled: true/false` flags for each task priority and configures `primary_task.mode` (`"cartesian"` or `"joint"`).
+* **`joy_teleop_params.yaml`**: Governs gamepad responsiveness. Sets hard caps for Cartesian translation/rotation velocities, acceleration ramps to prevent hardware jerks, anti-windup leashes, and gripper tuning constants.
 
-Launch the robot or Gazebo simulation using the tracking controller. Make sure `joint_pd_velocity_controller` is registered in your `controllers.yaml`.
+---
+
+## Complete Quick Start & Usage Guide
+
+The architecture utilizes a decoupled **Internal Model Control (IMC)** approach. Mathematical bounds are resolved inside an isolated virtual reference generator (500 Hz), which streams safe trajectories to a lean Joint PD Feedforward controller (1000 Hz).
+
+### Step 1: Hardware / Simulation Bringup
+
+Make sure `joint_pd_velocity_controller` is registered in your bringup package's `controllers.yaml`.
 
 **For Real Hardware:**
+
 ```bash
-ros2 launch franka__bringup example.launch.py \
+ros2 launch franka_bringup example.launch.py \
     controller:=joint_pd_velocity_controller \
     robot_type:=fr3 \
-    robot_ip:=172.16.0.2" \
+    robot_ip:=172.16.0.2 \
     load_gripper:=true
 
 ```
 
 **For Gazebo Simulation:**
+
 ```bash
 ros2 launch franka_gazebo_bringup gazebo_franka_arm_example_controller.launch.py \
     controller:=joint_pd_velocity_controller \
@@ -94,50 +105,83 @@ ros2 launch franka_gazebo_bringup gazebo_franka_arm_example_controller.launch.py
 
 ```
 
-### 2. Start the HQP Optimization Engine
+---
 
-In a new terminal, launch the virtual reference generator. This node reads the robot states, evaluates the `task` matrices, solves the Gurobi HQP constraints, and streams safe targets to the PD controller.
+### Step 2: Running Execution Scenarios
+
+#### Scenario A: Low-Level Hardware Diagnostics
+
+To verify the physical tracking performance of the PD controller and bypass the HQP solver entirely:
+
+```bash
+# Streams multi-joint sine waves directly to the hardware controller
+ros2 run lai_franka_controllers joint_pd_test_node
+
+```
+
+#### Scenario B: High-Level HQP Joint Tracking
+
+To verify the HQP solver in joint space. *(Ensure `primary_task.mode` is set to `"joint"` in `hqp_node_params.yaml`)*.
+
+**Terminal 1:** Start the HQP Solver
 
 ```bash
 ros2 launch lai_franka_controllers hqp_node.launch.py
 
 ```
 
-### 3. Send Goals (Trajectories, Teleoperation, or Diagnostics)
+**Terminal 2:** Launch the Diagnostic Sine Generator **OR** Publish Static Goals
 
-With the safety boundaries active, you can safely interact with the robot using automated nodes, teleoperation, or by publishing manual targets directly from the command line.
-
-#### Method A: Standalone Applications
-Ensure your `primary_task.mode` setting in `hqp_node_params.yaml` matches the space you are commanding (e.g., `"cartesian"` or `"joint"`).
-
+* **Option 1 (Sine Generator):**
 ```bash
-# Automated Quintic Trajectories and Boundary Stress Tests (Cartesian Mode)
-ros2 run lai_franka_controllers trajectory_generator_node
-
-# Xbox/Logitech Gamepad Teleoperation (Cartesian Mode)
-ros2 launch lai_franka_controllers joy_teleop.launch.py
-
-# Multi-Joint Feedforward Sinusoidal Diagnostics (Joint Mode)
 ros2 run lai_franka_controllers hqp_joint_trajectory_test_node
 
 ```
 
-#### Method B: Manual Command-Line (CLI) Target Injection
 
-You can manually publish static targets directly to the HQP stack or the active trajectory planner using the `--once` flag.
+* **Option 2 (Manual CLI Target):**
+```bash
+ros2 topic pub --once /hqp_reference_generator_node/target_joint sensor_msgs/msg/JointState \
+"{name: ['fr3_joint1'], position: [-1.5], velocity: [0.0]}"
 
-* **For Cartesian Mode via the Trajectory Planner (Recommended):**
-  When the `trajectory_generator_node` is active, publish your target to the global `/goal_pose` topic. The planner will intercept this, calculate a smooth quintic S-curve trajectory profile, and feed it incrementally to the HQP layer:
-  ```bash
-  ros2 topic pub --once /goal_pose geometry_msgs/msg/PoseStamped \
-  "{header: {frame_id: 'fr3_link0'}, pose: {position: {x: 0.5, y: 0.1, z: 0.4}, orientation: {w: 1.0, x: 0.0, y: 0.0, z: 0.0}}}"
-    ```
-
-*(Note: Setting a negative Z-value like `z: -0.1` here will automatically trigger the multi-waypoint boundary boundary stress test).*
+```
 
 
-* **For Cartesian Tracking Mode (Bypassing Planner):**
-Publish to the `/hqp_reference_generator_node/target_pose` topic. The solver will safely compute optimal joint velocities to track the 6D target:
+
+> **Note:** Unlike Cartesian mode, Joint mode does *not* feature an automated point-to-point path planner. It relies strictly on the diagnostic sine generator or direct manual target publications.
+
+#### Scenario C: Cartesian Operations (HQP + Planner / Direct Targets)
+
+Standard Cartesian operations. *(Ensure `primary_task.mode` is set to `"cartesian"` in `hqp_node_params.yaml`)*.
+
+**Terminal 1:** Start the HQP Solver
+
+```bash
+ros2 launch lai_franka_controllers hqp_node.launch.py
+
+```
+
+**Terminal 2:** Choose Trajectory Method
+
+* **Option 1: Using the Smooth Quintic Trajectory Planner (Recommended)**
+Start the planner node:
+```bash
+ros2 run lai_franka_controllers trajectory_generator_node
+
+```
+
+
+Send a smooth pose target to `/goal_pose`:
+```bash
+ros2 topic pub --once /goal_pose geometry_msgs/msg/PoseStamped \
+"{header: {frame_id: 'fr3_link0'}, pose: {position: {x: 0.5, y: 0.1, z: 0.4}, orientation: {w: 1.0, x: 0.0, y: 0.0, z: 0.0}}}"
+
+```
+
+
+*(Note: Setting `z < 0.0` automatically triggers the automated multi-waypoint boundary stress test).*
+* **Option 2: Direct Target Ingestion (Bypassing the Planner)**
+Publish directly to the reference generator without running `trajectory_generator_node`:
 ```bash
 ros2 topic pub --once /hqp_reference_generator_node/target_pose geometry_msgs/msg/PoseStamped \
 "{header: {frame_id: 'fr3_link0'}, pose: {position: {x: 0.4, y: 0.0, z: 0.4}, orientation: {w: 1.0, x: 0.0, y: 0.0, z: 0.0}}}"
@@ -145,12 +189,43 @@ ros2 topic pub --once /hqp_reference_generator_node/target_pose geometry_msgs/ms
 ```
 
 
-* **For Joint Tracking Mode:**
-Publish to the `/hqp_reference_generator_node/target_joint` topic. The updated name-mapping parser routes the targets dynamically. Specify the exact joint name array along with target positions and optional feedforward velocities:
+
+#### Scenario D: Gamepad Teleoperation (HQP + Joy)
+
+Safely drive the robot around using an Xbox/Logitech controller. The HQP solver will automatically prevent wall crashes or self-collisions.
+
+**Terminal 1:** Start the HQP Solver
+
 ```bash
-ros2 topic pub --once /hqp_reference_generator_node/target_joint sensor_msgs/msg/JointState \
-"{name: ['fr3_joint1'], position: [-1.5], velocity: [0.0]}"
+ros2 launch lai_franka_controllers hqp_node.launch.py
 
 ```
 
-> **Hardware Diagnostic Note:** If you need to verify the low-level physical tracking performance and bypass the HQP optimization stack entirely, you can stream commands directly to the hardware driver plugin topic (`/joint_pd_velocity_controller/joint_commands`) by running `ros2 run lai_franka_controllers joint_pd_test_node`.
+**Terminal 2:** Start the Teleoperation Node
+
+```bash
+ros2 launch lai_franka_controllers joy_teleop.launch.py
+
+```
+
+*(**WSL2 Note:** If standard `/dev/input/js0` fails inside a virtual machine, open `joy_teleop.launch.py` and uncomment the `raw_usb_joy_node` section to enable direct USB polling).*
+
+---
+
+## Diagnostics & System Monitoring
+
+The HQP Reference generator streams lock-free diagnostics for real-time analysis. Open PlotJuggler to monitor system state and bounds:
+
+```bash
+ros2 run plotjuggler plotjuggler
+
+```
+
+**Key Diagnostic Topics:**
+
+* `~/hqp_reference_generator_node/tracking_error` *(Twist error vector between virtual reference and target)*
+* `~/hqp_reference_generator_node/virtual_wall_distances` *(Array of distances to the 6 virtual bounding planes)*
+* `~/hqp_reference_generator_node/self_hits_distances` *(Distance between end-effector and base links)*
+* `~/hqp_reference_generator_node/current_pose` *(Live 6D pose of the internal virtual robot model)*
+* `/joint_pd_velocity_controller/joint_commands` *(Commanded targets generated by the HQP solver)*
+* `/joint_pd_velocity_controller/output_dq_cmd` *(Actual velocities dispatched to physical motor drivers)*

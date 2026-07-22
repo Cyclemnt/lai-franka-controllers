@@ -26,14 +26,17 @@ HqpReferenceGeneratorNode::HqpReferenceGeneratorNode() : Node("hqp_reference_gen
     declare_if_not_exists("A7e", std::vector<double>());
 
     // Declare new configuration parameters matching yaml specifications
+    declare_if_not_exists("joint_limits.enabled", true);
     declare_if_not_exists("joint_limits.q_max", std::vector<double>({2.897, 1.832, 2.897, -0.122, 2.879, 4.625, 3.054}));
     declare_if_not_exists("joint_limits.q_min", std::vector<double>({-2.897, -1.832, -2.897, -3.071, -2.879, 0.436, -3.054}));
     declare_if_not_exists("joint_limits.dq_max", std::vector<double>({0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5}));
     
+    declare_if_not_exists("self_collision.enabled", true);
     declare_if_not_exists("self_collision.safe_points", std::vector<int64_t>({6}));
     declare_if_not_exists("self_collision.avoid_points", std::vector<int64_t>({0, 3}));
     declare_if_not_exists("self_collision.min_distance", 0.2);
 
+    declare_if_not_exists("virtual_walls.enabled", true);
     declare_if_not_exists("virtual_walls.joints_to_protect", std::vector<int64_t>({3, 7}));
     declare_if_not_exists("virtual_walls.margin", 0.05);
     declare_if_not_exists("virtual_walls.gain", 1.0);
@@ -45,6 +48,7 @@ HqpReferenceGeneratorNode::HqpReferenceGeneratorNode() : Node("hqp_reference_gen
     declare_if_not_exists("virtual_walls.left_y", 0.5);
     declare_if_not_exists("virtual_walls.right_y", -0.5);
 
+    declare_if_not_exists("primary_task.enabled", true);
     declare_if_not_exists("primary_task.mode", std::string("cartesian"));
     declare_if_not_exists("primary_task.priority", 4);
     declare_if_not_exists("primary_task.gain", 5.0);
@@ -93,14 +97,14 @@ HqpReferenceGeneratorNode::HqpReferenceGeneratorNode() : Node("hqp_reference_gen
     // ==========================================
     // PRIORITY LEVEL 1: SAFETY JOINT LIMITS
     // ==========================================
+    bool joint_limits_enabled = this->get_parameter("joint_limits.enabled").as_bool();
+
     q_upper_task_ = std::make_shared<JointsConfigurationLimits>(kinematics_.get(), q_max_, GRB_LESS_EQUAL, 1.0);
     q_lower_task_ = std::make_shared<JointsConfigurationLimits>(kinematics_.get(), q_min_, GRB_GREATER_EQUAL, 1.0);
     q_upper_task_->setPriorityLevel(1);
     q_lower_task_->setPriorityLevel(1);
     q_upper_task_->setSlacksState(false);
     q_lower_task_->setSlacksState(false);
-    task_stack_.push_back(q_upper_task_);
-    task_stack_.push_back(q_lower_task_);
     
     dq_upper_task_ = std::make_shared<JointsVelocityLimits>(kinematics_.get(), dq_limit_, GRB_LESS_EQUAL, 1.0);
     dq_lower_task_ = std::make_shared<JointsVelocityLimits>(kinematics_.get(), -dq_limit_, GRB_GREATER_EQUAL, 1.0);
@@ -108,12 +112,18 @@ HqpReferenceGeneratorNode::HqpReferenceGeneratorNode() : Node("hqp_reference_gen
     dq_lower_task_->setPriorityLevel(1);
     dq_upper_task_->setSlacksState(false);
     dq_lower_task_->setSlacksState(false);
-    task_stack_.push_back(dq_upper_task_);
-    task_stack_.push_back(dq_lower_task_);
-    
+
+    if (joint_limits_enabled) {
+        task_stack_.push_back(q_upper_task_);
+        task_stack_.push_back(q_lower_task_);
+        task_stack_.push_back(dq_upper_task_);
+        task_stack_.push_back(dq_lower_task_);
+    }
+
     // ==========================================
     // PRIORITY LEVEL 2: SELF-COLLISION PROTECTION
     // ==========================================
+    bool selfhits_enabled = this->get_parameter("self_collision.enabled").as_bool();
     auto safe_pts_raw = this->get_parameter("self_collision.safe_points").as_integer_array();
     auto avoid_pts_raw = this->get_parameter("self_collision.avoid_points").as_integer_array();
     double selfhits_min_dist = this->get_parameter("self_collision.min_distance").as_double();
@@ -127,11 +137,12 @@ HqpReferenceGeneratorNode::HqpReferenceGeneratorNode() : Node("hqp_reference_gen
     self_collision_task_ = std::make_shared<SelfHits>(kinematics_.get(), sefhits_safe_points, sefhits_avoid_points, selfhits_min_dist, GRB_GREATER_EQUAL, 1.0);
     self_collision_task_->setPriorityLevel(2);
     self_collision_task_->setSlacksState(false);
-    task_stack_.push_back(self_collision_task_);
+    if (selfhits_enabled) task_stack_.push_back(self_collision_task_);
 
     // ==========================================
     // PRIORITY LEVEL 3: WORKSPACE VIRTUAL WALL BOX
     // ==========================================
+    bool virtual_walls_enabled = this->get_parameter("virtual_walls.enabled").as_bool();
     auto protect_joints_raw = this->get_parameter("virtual_walls.joints_to_protect").as_integer_array();
     Eigen::VectorXi joints_to_protect_from_walls(protect_joints_raw.size());
     for (size_t i = 0; i < protect_joints_raw.size(); ++i) joints_to_protect_from_walls(i) = static_cast<int>(protect_joints_raw[i]);
@@ -173,12 +184,13 @@ HqpReferenceGeneratorNode::HqpReferenceGeneratorNode() : Node("hqp_reference_gen
     for (auto& wall : all_virtual_walls) {
         wall->setPriorityLevel(wall_priority);
         wall->setSlacksState(false);
-        task_stack_.push_back(wall);
+        if (virtual_walls_enabled) task_stack_.push_back(wall);
     }
 
     // ==========================================
     // PRIORITY LEVEL 4: PRIMARY TRACKING TASK (CONDITIONAL)
     // ==========================================
+    bool primary_task_enabled = this->get_parameter("primary_task.enabled").as_bool();
     task_mode_ = this->get_parameter("primary_task.mode").as_string();
     int task_priority = static_cast<int>(this->get_parameter("primary_task.priority").as_int());
     double task_gain = this->get_parameter("primary_task.gain").as_double();
@@ -187,7 +199,7 @@ HqpReferenceGeneratorNode::HqpReferenceGeneratorNode() : Node("hqp_reference_gen
         pose_task_ = std::make_shared<Pose>(kinematics_.get(), GRB_EQUAL, Eigen::VectorXd::Ones(6), task_gain);
         pose_task_->setPriorityLevel(task_priority);
         pose_task_->setSlacksState(true); 
-        task_stack_.push_back(pose_task_);
+        if (primary_task_enabled) task_stack_.push_back(pose_task_);
 
         target_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
             "~/target_pose", 10, std::bind(&HqpReferenceGeneratorNode::target_pose_callback, this, std::placeholders::_1));
@@ -198,7 +210,7 @@ HqpReferenceGeneratorNode::HqpReferenceGeneratorNode() : Node("hqp_reference_gen
         joint_tracking_task_ = std::make_shared<task::JointTracking>(kinematics_.get(), GRB_EQUAL, task_gain);
         joint_tracking_task_->setPriorityLevel(task_priority);
         joint_tracking_task_->setSlacksState(true);
-        task_stack_.push_back(joint_tracking_task_);
+        if (primary_task_enabled) task_stack_.push_back(joint_tracking_task_);
 
         target_joint_sub_ = this->create_subscription<sensor_msgs::msg::JointState>(
             "~/target_joint", 10, std::bind(&HqpReferenceGeneratorNode::target_joint_callback, this, std::placeholders::_1));
